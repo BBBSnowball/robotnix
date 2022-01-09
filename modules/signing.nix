@@ -130,6 +130,18 @@ in
         '';
         example = "/var/secrets/android-keys";
       };
+
+      keyStoreUseDummy = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Don't try to use the key store.
+          The build won't work but this can be used to test whether the configuration is ok (apart from the keys). Furthermore, this
+          may be required for generating the script that will generate the keys.
+        '';
+        #TODO Why is that? Simple derivations should work without the keys (especially everything that we need to generate the keys).
+        #     Is this (only) due to skipIfApkMissing in modules/apps/prebuilt ? If so, get rid of it.
+      };
     };
   };
 
@@ -152,6 +164,8 @@ in
       let relativePathOfKey = "${config.device}/avb_pkmd.bin"; in
       if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" relativePathOfKey "fingerprint"] config
         then config.signing.keyStoreMetadata."${relativePathOfKey}".fingerprint
+      else if config.signing.keyStoreUseDummy
+        then "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
       else if (builtins.tryEval config.signing.keyStorePath).success
         then pkgs.robotnix.sha256Fingerprint (putInStore "${config.signing.keyStorePath}/${relativePathOfKey}")
       else throw ("The option `signing.keyStorePath' is used but not defined while evaluating default value for `signing.avb.fingerprint'."
@@ -162,6 +176,8 @@ in
       let relativePathOfKey = "${config.device}/verity.x509.pem"; in
       if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" relativePathOfKey "file"] config
         then config.signing.keyStoreMetadata."${relativePathOfKey}".file
+      else if config.signing.keyStoreUseDummy
+        then pkgs.writeText "dummy.txt" "not the actual cert, dummy generated because of config.signing.keyStoreUseDummy"
       else if (builtins.tryEval config.signing.keyStorePath).success
         then putInStore "${config.signing.keyStorePath}/${config.device}/${relativePathOfKey}"
       else throw ("The option `signing.keyStorePath' is used but not defined while evaluating default value for `signing.avb.verityCert'."

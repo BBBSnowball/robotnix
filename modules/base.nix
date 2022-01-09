@@ -315,10 +315,12 @@ in
 
           nativeBuildInputs = [ config.build.env fakeuser ];
 
-          unpackPhase = ''
-            export rootDir=$PWD
-            source ${config.build.unpackScript}
-          '';
+          unpackPhase =
+            (lib.optionalString config.signing.keyStoreUseDummy "echo 'Build disabled because of config.signing.keyStoreUseDummy' >&2; exit 1")
+            + ''
+              export rootDir=$PWD
+              source ${config.build.unpackScript}
+            '';
 
           dontConfigure = true;
 

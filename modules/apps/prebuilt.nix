@@ -64,7 +64,9 @@ let
     let relativePathOfKey = builtins.substring 1 (-1) (_keyPath "" certName); in
     if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" "${relativePathOfKey}.x509.pem" "fingerprint"] config
       then config.signing.keyStoreMetadata."${relativePathOfKey}.x509.pem".fingerprint
-      else pkgs.robotnix.certFingerprint (putInStore "${evalTimeKeyPath appName certName}.x509.pem"); # TODO: IFD
+    else if config.signing.keyStoreUseDummy
+      then "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    else pkgs.robotnix.certFingerprint (putInStore "${evalTimeKeyPath appName certName}.x509.pem"); # TODO: IFD
 
   # Skip apps which are enabled but don't have any APK. This can easily happen if the user sets a fingerprint
   # for an app that is not enabled.
