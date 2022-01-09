@@ -40,6 +40,13 @@ let
 
     patchShebangs $out/bin
   '';
+
+  generateKeysInfo = pkgs.writeText "robotnix-generate-keys-info.json" (builtins.toJSON {
+    keys = keysToGenerate;
+    apex_keys = lib.optionals config.signing.apex.enable config.signing.apex.packageNames;
+    avb_mode = config.signing.avb.mode;
+    device = config.device;
+  });
 in
 {
   options = {
@@ -220,8 +227,10 @@ in
     build.generateKeysScript = pkgs.writeShellScript "generate_keys.sh" ''
       set -euo pipefail
 
-      if [[ "$#" -ne 1 ]]; then
-        echo "Usage: $0 <keysdir>"
+      if [[ "$#" -eq 1 ]] ; then
+        echo "You should pass two arguments to extract metadata from the generated keys."
+      elif [[ "$#" -ne 2 ]]; then
+        echo "Usage: $0 <keysdir> [<metadatadir>]"
         echo "$#"
         exit 1
       fi
@@ -229,58 +238,13 @@ in
       mkdir -p "$1"
       cd "$1"
 
-      export PATH=${lib.getBin pkgs.openssl}/bin:${keyTools}/bin:$PATH
+      export PATH=${lib.getBin pkgs.openssl}/bin:${keyTools}/bin:${pkgs.jq}/bin:$PATH
 
-      KEYS=( ${toString keysToGenerate} )
-      APEX_KEYS=( ${lib.optionalString config.signing.apex.enable (toString config.signing.apex.packageNames)} )
-
-      mkdir -p "${config.device}"
-
-      for key in "''${KEYS[@]}"; do
-        if [[ ! -e "$key".pk8 ]]; then
-          echo "Generating $key key"
-          # make_key exits with unsuccessful code 1 instead of 0
-          make_key "$key" "/CN=Robotnix ''${key/\// }/" && exit 1
-        else
-          echo "Skipping generating $key key since it is already exists"
-        fi
-      done
-
-      for key in "''${APEX_KEYS[@]}"; do
-        if [[ ! -e "$key".pem ]]; then
-          echo "Generating $key APEX AVB key"
-          openssl genrsa -out "$key".pem 4096
-          avbtool extract_public_key --key "$key".pem --output "$key".avbpubkey
-        else
-          echo "Skipping generating $key APEX key since it is already exists"
-        fi
-      done
-
-      ${lib.optionalString (config.signing.avb.mode == "verity_only") ''
-      if [[ ! -e "${config.device}/verity_key.pub" ]]; then
-          generate_verity_key -convert ${config.device}/verity.x509.pem ${config.device}/verity_key
-      fi
-      ''}
-
-      ${lib.optionalString (config.signing.avb.mode != "verity_only") ''
-      if [[ ! -e "${config.device}/avb.pem" ]]; then
-        # TODO: Maybe switch to 4096 bit avb key to match apex? Any device-specific problems with doing that?
-        echo "Generating Device AVB key"
-        openssl genrsa -out ${config.device}/avb.pem 2048
-        avbtool extract_public_key --key ${config.device}/avb.pem --output ${config.device}/avb_pkmd.bin
-      else
-        echo "Skipping generating device AVB key since it is already exists"
-      fi
-      ''}
+      exec ${../scripts/generate_keys.sh} "${generateKeysInfo}" "$1" "''${2-}"
     '';
 
     build.keyTools = keyTools;
-    build.generateKeysInfo = pkgs.writeText "robotnix-generate-keys-info.json" (builtins.toJSON {
-      keys = keysToGenerate;
-      apex_keys = lib.optionals config.signing.apex.enable config.signing.apex.packageNames;
-      avb_mode = config.signing.avb.mode;
-      device = config.device;
-    });
+    build.generateKeysInfo = generateKeysInfo;
     build.generateKeysShell = pkgs.mkShell {
       name = "robotnix-generate-keys-shell";
       packages = with pkgs; [ openssl keyTools jq ];
