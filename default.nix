@@ -87,5 +87,6 @@ in {
     targetFiles unsignedTargetFiles signedTargetFiles
     ota incrementalOta img factoryImg bootImg otaDir
     releaseScript generateKeysScript verifyKeysScript
+    generateKeysInfo keyTools generateKeysShell
     emulator;
 }

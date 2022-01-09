@@ -22,6 +22,24 @@ let
                         (name: prebuilt: prebuilt.certificate)
                         (lib.filterAttrs (name: prebuilt: prebuilt.enable && prebuilt.certificate != "PRESIGNED") config.apps.prebuilt))
                     ));
+
+  # Get a bunch of utilities to generate keys
+  keyTools = pkgs.runCommandCC "android-key-tools" { buildInputs = [ (if config.androidVersion >= 12 then pkgs.python3 else pkgs.python2) ]; } ''
+    mkdir -p $out/bin
+
+    cp ${config.source.dirs."development".src}/tools/make_key $out/bin/make_key
+    substituteInPlace $out/bin/make_key --replace openssl ${lib.getBin pkgs.openssl}/bin/openssl
+
+    cc -o $out/bin/generate_verity_key \
+      ${config.source.dirs."system/extras".src}/verity/generate_verity_key.c \
+      ${config.source.dirs."system/core".src}/libcrypto_utils/android_pubkey.c${lib.optionalString (config.androidVersion >= 12) "pp"} \
+      -I ${config.source.dirs."system/core".src}/libcrypto_utils/include/ \
+      -I ${pkgs.boringssl}/include ${pkgs.boringssl}/lib/libssl.a ${pkgs.boringssl}/lib/libcrypto.a -lpthread
+
+    cp ${config.source.dirs."external/avb".src}/avbtool $out/bin/avbtool
+
+    patchShebangs $out/bin
+  '';
 in
 {
   options = {
@@ -197,27 +215,9 @@ in
       then [ "-k $KEYSDIR/${config.device}/releasekey" ]
       else [ "-k ${config.source.dirs."build/make".src}/target/product/security/testkey" ];
 
-    build.generateKeysScript = let
-      # Get a bunch of utilities to generate keys
-      keyTools = pkgs.runCommandCC "android-key-tools" { buildInputs = [ (if config.androidVersion >= 12 then pkgs.python3 else pkgs.python2) ]; } ''
-        mkdir -p $out/bin
-
-        cp ${config.source.dirs."development".src}/tools/make_key $out/bin/make_key
-        substituteInPlace $out/bin/make_key --replace openssl ${lib.getBin pkgs.openssl}/bin/openssl
-
-        cc -o $out/bin/generate_verity_key \
-          ${config.source.dirs."system/extras".src}/verity/generate_verity_key.c \
-          ${config.source.dirs."system/core".src}/libcrypto_utils/android_pubkey.c${lib.optionalString (config.androidVersion >= 12) "pp"} \
-          -I ${config.source.dirs."system/core".src}/libcrypto_utils/include/ \
-          -I ${pkgs.boringssl}/include ${pkgs.boringssl}/lib/libssl.a ${pkgs.boringssl}/lib/libcrypto.a -lpthread
-
-        cp ${config.source.dirs."external/avb".src}/avbtool $out/bin/avbtool
-
-        patchShebangs $out/bin
-      '';
     # TODO: avbkey is not encrypted. Can it be? Need to get passphrase into avbtool
     # Generate either verity or avb--not recommended to use same keys across devices. e.g. attestation relies on device-specific keys
-    in pkgs.writeShellScript "generate_keys.sh" ''
+    build.generateKeysScript = pkgs.writeShellScript "generate_keys.sh" ''
       set -euo pipefail
 
       if [[ "$#" -ne 1 ]]; then
@@ -273,6 +273,18 @@ in
       fi
       ''}
     '';
+
+    build.keyTools = keyTools;
+    build.generateKeysInfo = pkgs.writeText "robotnix-generate-keys-info.json" (builtins.toJSON {
+      keys = keysToGenerate;
+      apex_keys = lib.optionals config.signing.apex.enable config.signing.apex.packageNames;
+      avb_mode = config.signing.avb.mode;
+      device = config.device;
+    });
+    build.generateKeysShell = pkgs.mkShell {
+      name = "robotnix-generate-keys-shell";
+      packages = with pkgs; [ openssl keyTools jq ];
+    };
 
     # Check that all needed keys are available.
     # TODO: Remove code duplicated with generate_keys.sh
