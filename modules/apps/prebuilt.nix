@@ -58,7 +58,10 @@ let
 
   putInStore = path: if (lib.hasPrefix builtins.storeDir path) then path else (/. + path);
 
-  enabledPrebuilts = lib.filter (p: p.enable) (lib.attrValues cfg);
+  # Skip apps which are enabled but don't have any APK. This can easily happen if the user sets a fingerprint
+  # for an app that is not enabled.
+  skipIfApkMissing = p: lib.warnIf (!(p.enable -> p.apk != null)) ("Ignoring prebuilt app " + p.name + " because of missing APK.") (p.apk != null);
+  enabledPrebuilts = lib.filter (p: p.enable && skipIfApkMissing p) (lib.attrValues cfg);
 in
 {
   options = {
