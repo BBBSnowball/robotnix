@@ -235,9 +235,6 @@ in
         exit 1
       fi
 
-      mkdir -p "$1"
-      cd "$1"
-
       export PATH=${lib.getBin pkgs.openssl}/bin:${keyTools}/bin:${pkgs.jq}/bin:$PATH
 
       exec ${../scripts/generate_keys.sh} "${generateKeysInfo}" "$1" "''${2-}"
