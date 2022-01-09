@@ -50,7 +50,10 @@ let
         then "${keyStorePath}/${config.device}/${name}"
         else "${keyStorePath}/${lib.replaceStrings ["releasekey"] ["testkey"] name}") # If not signing.enable, use test keys from AOSP
       else "${keyStorePath}/${name}";
-  evalTimeKeyPath = name: _keyPath config.signing.keyStorePath name;
+  evalTimeKeyPath = appName: name:
+    if (builtins.tryEval config.signing.keyStorePath).success
+      then _keyPath config.signing.keyStorePath name
+      else throw "The option `signing.keyStorePath' is used but not defined. Alternatively, you can set `apps.prebuilt.\"${appName}\".fingerprint'.";
   buildTimeKeyPath = name: _keyPath config.signing.buildTimeKeyStorePath name;
 
   putInStore = path: if (lib.hasPrefix builtins.storeDir path) then path else (/. + path);
@@ -217,7 +220,7 @@ in
             if config.certificate == "PRESIGNED"
               then pkgs.robotnix.apkFingerprint config.signedApk # TODO: IFD
             else if _config.signing.enable
-              then pkgs.robotnix.certFingerprint (putInStore "${evalTimeKeyPath config.certificate}.x509.pem") # TODO: IFD
+              then pkgs.robotnix.certFingerprint (putInStore "${evalTimeKeyPath config.name config.certificate}.x509.pem") # TODO: IFD
             else # !_config.signing.enable
               defaultDeviceCertFingerprints.${name} or (
                 builtins.trace ''
