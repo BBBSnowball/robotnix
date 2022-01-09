@@ -88,7 +88,14 @@ change_pw_pk8() {
     outargs=( -nocrypt )
     inargs2=( -nocrypt )
   else
-    outargs=( -passout env:newpassword -scrypt )
+    # make_key uses -scrypt but javax.crypto.EncryptedPrivateKeyInfo wants PBKDF2.
+    # -> It still fails with `NoSuchAlgorithmException: 1.2.840.113549.1.5.13' -> "Password-Based Encryption Scheme 2 (PBES2)"
+    # -> https://github.com/pgjdbc/pgjdbc/issues/1585#issuecomment-545116845
+    # -> SHA1 and triple DES seems to be the best we can do: https://www.openssl.org/docs/manmaster/man1/openssl-pkcs8.html#PKCS-5-V1.5-AND-PKCS-12-ALGORITHMS
+    # (view key files with: openssl asn1parse -inform der -i -in keys/redfin/releasekey.pk8)
+    #TODO openjdk-11.0.12+7 does support the scrypt keys but the Java that is used in the release script apperently not. Check with master and either switch to scrypt or change the generate script, as well.
+    #outargs=( -passout env:newpassword -scrypt )
+    outargs=( -passout env:newpassword -v1 PBE-SHA1-3DES )
     inargs2=( -passin  env:newpassword )
   fi
 
