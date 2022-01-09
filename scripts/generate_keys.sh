@@ -11,7 +11,7 @@ if [[ "$#" -ne 3 ]]; then
 fi
 
 for tool in openssl jq make_key generate_verity_key avbtool ; do
-  if !which $tool &>/dev/null ; then
+  if ! which $tool &>/dev/null ; then
     echo "Missing tool: $tool" >&2
     echo "Required tools: openssl, jq, keytools (nix-build . -A keyTools)"
     exit 1
