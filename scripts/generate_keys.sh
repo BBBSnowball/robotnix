@@ -74,25 +74,29 @@ if [[ -n "$3" ]] ; then
   
   out="$3/.metadata.nix.tmp"
   echo "{" >"$out"
+  echo "  signing.keyStoreMetadata = {" >>"$out"
   
   ( cd "$2" && find . -type f -name "*.x509.pem" ) | while read key ; do
     echo "Extracting fingerprint from ${key#./}"
     fingerprint="$(openssl x509 -noout -fingerprint -sha256 -in "$2/$key")"
     fingerprint="${fingerprint#*=}"
     fingerprint="${fingerprint//:/}"
-    echo "  keyStore.keys.\"${key#./}\".fingerprint = \"$fingerprint\";" >>"$out"
+    echo "    \"${key#./}\".fingerprint = \"$fingerprint\";" >>"$out"
+    if [[ "${key##*/}" == "verity.x509.pem" ]] ; then
+      cp "$2/$key" "$3/${fingerprint,,}.x509.pem"
+      echo "    \"${key#./}\".file = ./$fingerprint.x509.pem;" >>"$out"
+    fi
   done
   
   ( cd "$2" && find . -type f \( -name "avb_pkmd.bin" -or -name "*.avbpubkey" \) ) | while read key ; do
     echo "Extracting fingerprint from ${key#./}"
     hash="$(sha256sum "$2/$key" | cut -f1 -d" ")"
     cp "$2/$key" "$3/$hash.avbpubkey"
-    echo "  keyStore.keys.\"${key#./}\".fingerprint = \"${hash^^}\";" >>"$out"
-    echo "  keyStore.keys.\"${key#./}\".file = ./$hash.avbpubkey;" >>"$out"
+    echo "    \"${key#./}\".fingerprint = \"${hash^^}\";" >>"$out"
+    echo "    \"${key#./}\".file = ./$hash.avbpubkey;" >>"$out"
   done
-  
-  #TODO: what about verity_key?
-  
+
+  echo "  };" >>"$out"
   echo "}" >>"$out"
   mv "$out" "$3/metadata.nix"
 fi
