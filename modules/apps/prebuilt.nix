@@ -53,10 +53,18 @@ let
   evalTimeKeyPath = appName: name:
     if (builtins.tryEval config.signing.keyStorePath).success
       then _keyPath config.signing.keyStorePath name
-      else throw "The option `signing.keyStorePath' is used but not defined. Alternatively, you can set `apps.prebuilt.\"${appName}\".fingerprint'.";
+      else throw ("The option `signing.keyStorePath' is used but not defined. Alternatively, you can set `apps.prebuilt.\"${appName}\".fingerprint'"
+        + " or generate metadata.nix from your key store and add it to your config (which is the preferred method). If you have have already added"
+        + " metadata.nix, the key for `${appName}' (${name}.x509.pem) may be missing from your key store and/ or the metadata file.");
   buildTimeKeyPath = name: _keyPath config.signing.buildTimeKeyStorePath name;
 
   putInStore = path: if (lib.hasPrefix builtins.storeDir path) then path else (/. + path);
+
+  certFingerprint = appName: certName:
+    let relativePathOfKey = builtins.substring 1 (-1) (_keyPath "" certName); in
+    if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" "${relativePathOfKey}.x509.pem" "fingerprint"] config
+      then config.signing.keyStoreMetadata."${relativePathOfKey}.x509.pem".fingerprint
+      else pkgs.robotnix.certFingerprint (putInStore "${evalTimeKeyPath appName certName}.x509.pem"); # TODO: IFD
 
   # Skip apps which are enabled but don't have any APK. This can easily happen if the user sets a fingerprint
   # for an app that is not enabled.
@@ -223,7 +231,7 @@ in
             if config.certificate == "PRESIGNED"
               then pkgs.robotnix.apkFingerprint config.signedApk # TODO: IFD
             else if _config.signing.enable
-              then pkgs.robotnix.certFingerprint (putInStore "${evalTimeKeyPath config.name config.certificate}.x509.pem") # TODO: IFD
+              then certFingerprint config.name config.certificate
             else # !_config.signing.enable
               defaultDeviceCertFingerprints.${name} or (
                 builtins.trace ''

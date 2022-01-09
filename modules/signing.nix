@@ -148,10 +148,26 @@ in
       (mkIf config.signing.enable (mkDefault "/keys"))
       (mkIf (!config.signing.enable) (mkDefault testKeysStorePath))
     ];
-    signing.avb.fingerprint = mkIf config.signing.enable (mkOptionDefault
-      (pkgs.robotnix.sha256Fingerprint (putInStore "${config.signing.keyStorePath}/${config.device}/avb_pkmd.bin"))
-      );
-    signing.avb.verityCert = mkIf config.signing.enable (mkOptionDefault (putInStore "${config.signing.keyStorePath}/${config.device}/verity.x509.pem"));
+    signing.avb.fingerprint = mkIf config.signing.enable (mkOptionDefault (
+      let relativePathOfKey = "${config.device}/avb_pkmd.bin"; in
+      if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" relativePathOfKey "fingerprint"] config
+        then config.signing.keyStoreMetadata."${relativePathOfKey}".fingerprint
+      else if (builtins.tryEval config.signing.keyStorePath).success
+        then pkgs.robotnix.sha256Fingerprint (putInStore "${config.signing.keyStorePath}/${relativePathOfKey}")
+      else throw ("The option `signing.keyStorePath' is used but not defined while evaluating default value for `signing.avb.fingerprint'."
+        + " You can set one of these options or generate metadata.nix from your key store and add it to your config (which is the preferred method). If you have have already added"
+        + " metadata.nix, the key `${relativePathOfKey}' may be missing from your key store and/ or the metadata file.")
+      ));
+    signing.avb.verityCert = mkIf config.signing.enable (mkOptionDefault (
+      let relativePathOfKey = "${config.device}/verity.x509.pem"; in
+      if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" relativePathOfKey "file"] config
+        then config.signing.keyStoreMetadata."${relativePathOfKey}".file
+      else if (builtins.tryEval config.signing.keyStorePath).success
+        then putInStore "${config.signing.keyStorePath}/${config.device}/${relativePathOfKey}"
+      else throw ("The option `signing.keyStorePath' is used but not defined while evaluating default value for `signing.avb.verityCert'."
+        + " You can set one of these options or generate metadata.nix from your key store and add it to your config (which is the preferred method). If you have have already added"
+        + " metadata.nix, the key `${relativePathOfKey}' may be missing from your key store and/ or the metadata file.")
+      ));
 
     signing.apex.enable = mkIf (config.androidVersion >= 10) (mkDefault true);
     # TODO: Some of these apex packages share the same underlying keys. We should try to match that. See META/apexkeys.txt from  target-files
