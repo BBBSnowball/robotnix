@@ -88,5 +88,6 @@ in {
     ota incrementalOta img factoryImg bootImg otaDir
     releaseScript generateKeysScript verifyKeysScript
     generateKeysInfo keyTools generateKeysShell
+    releaseScriptInfo releaseScriptShell otaTools
     emulator;
 }

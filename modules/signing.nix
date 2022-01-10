@@ -92,6 +92,12 @@ in
           type = types.path;
           description = "Verity certificate for AVB. e.g. in x509 DER format.x509.pem. Only needed if signing.avb.mode = \"verity_only\"";
         };
+
+        verityFingerprint = mkOption {
+          type = types.nullOr (types.strMatching "[0-9A-F]{64}");
+          internal = true;
+          description = "Fingerprint of verityCert. Only needed if signing.avb.mode = \"verity_only\"";
+        };
       };
 
       apex = {
@@ -183,8 +189,17 @@ in
       else throw ("The option `signing.keyStorePath' is used but not defined while evaluating default value for `signing.avb.verityCert'."
         + " You can set one of these options or generate metadata.nix from your key store and add it to your config (which is the preferred method). If you have have already added"
         + " metadata.nix, the key `${relativePathOfKey}' may be missing from your key store and/ or the metadata file.")
-      ));
-
+    ));
+    signing.avb.verityFingerprint =
+      let relativePathOfKey = "${config.device}/verity.x509.pem"; in
+      if config.signing.enable && config.signing.avb.mode != "verity_only"
+        then null
+      else if lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" relativePathOfKey "file"] config
+          && lib.attrsets.hasAttrByPath ["signing" "keyStoreMetadata" relativePathOfKey "fingerprint"] config
+          && config.signing.keyStoreMetadata."${relativePathOfKey}".file == config.signing.avb.verityCert
+        then config.signing.keyStoreMetadata."${relativePathOfKey}".fingerprint
+      else pkgs.robotnix.certFingerprint config.signing.avb.verityCert;
+ 
     signing.apex.enable = mkIf (config.androidVersion >= 10) (mkDefault true);
     # TODO: Some of these apex packages share the same underlying keys. We should try to match that. See META/apexkeys.txt from  target-files
     signing.apex.packageNames = map (s: "com.android.${s}") (
