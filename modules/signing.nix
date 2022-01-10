@@ -291,7 +291,6 @@ in
     };
 
     # Check that all needed keys are available.
-    # TODO: Remove code duplicated with generate_keys.sh
     build.verifyKeysScript = pkgs.writeShellScript "verify_keys.sh" ''
       set -euo pipefail
 
@@ -300,48 +299,9 @@ in
         exit 1
       fi
 
-      cd "$1"
+      export PATH=${pkgs.jq}/bin:$PATH
 
-      KEYS=( ${toString keysToGenerate} )
-      APEX_KEYS=( ${lib.optionalString config.signing.apex.enable (toString config.signing.apex.packageNames)} )
-
-      RETVAL=0
-
-      for key in "''${KEYS[@]}"; do
-        if [[ ! -e "$key".pk8 ]]; then
-          echo "Missing $key key"
-          RETVAL=1
-        fi
-      done
-
-      for key in "''${APEX_KEYS[@]}"; do
-        if [[ ! -e "$key".pem ]]; then
-          echo "Missing $key APEX AVB key"
-          RETVAL=1
-        fi
-      done
-
-      ${lib.optionalString (config.signing.avb.mode == "verity_only") ''
-      if [[ ! -e "${config.device}/verity_key.pub" ]]; then
-        echo "Missing verity_key.pub"
-        RETVAL=1
-      fi
-      ''}
-
-      ${lib.optionalString (config.signing.avb.mode != "verity_only") ''
-      if [[ ! -e "${config.device}/avb.pem" ]]; then
-        echo "Missing Device AVB key"
-        RETVAL=1
-      fi
-      ''}
-
-      if [[ "$RETVAL" -ne 0 ]]; then
-        echo Certain keys were missing from KEYSDIR. Have you run generateKeysScript?
-        echo Additionally, some robotnix configuration options require that you re-run
-        echo generateKeysScript to create additional new keys.  This should not overwrite
-        echo existing keys.
-      fi
-      exit $RETVAL
+      exec ${../scripts/verify_keys.sh} "${generateKeysInfo}" "$1"
     '';
   };
 
