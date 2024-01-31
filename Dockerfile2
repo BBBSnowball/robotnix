@@ -1,0 +1,9 @@
+FROM x1
+VOLUME /grapheneos-14
+
+WORKDIR /grapheneos-14
+RUN chown user .
+USER user
+RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b 14
+RUN repo sync -j8
+

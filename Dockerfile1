@@ -1,0 +1,20 @@
+#FROM docker.io/library/ubuntu:22.04
+FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74
+
+RUN apt update && apt install -y iproute2 tig htop \
+  repo python3 git gnupg openssh-server diffutils libfreetype6 fontconfig fonts-dejavu-core libncurses5-dev openssl rsync unzip zip yarn e2fsprogs gperf python3-protobuf gcc-multilib signify \
+  ca-certificates curl gnupg
+
+# https://github.com/nodesource/distributions?tab=readme-ov-file#using-ubuntu-2
+# https://github.com/nodesource/distributions/wiki/Repository-Manual-Installation
+#RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
+#  apt install -y nodejs yarn
+COPY ./nodesource-repo.gpg.key /tmp
+RUN gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg </tmp/nodesource-repo.gpg.key \
+  && rm /tmp/nodesource-repo.gpg.key \
+  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+  && apt update \
+  && apt install -y nodejs yarn
+
+RUN adduser user --disabled-password </dev/null
+
