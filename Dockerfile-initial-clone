@@ -1,0 +1,28 @@
+#FROM docker.io/library/ubuntu:22.04
+FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74
+
+# add few dependencies here so we have less reason to run that `repo sync` again (which would mean from scratch)
+RUN apt update && apt install -y \
+  repo python3 git gnupg
+
+RUN adduser user --disabled-password </dev/null
+RUN install -o user -g user -m 700 -d /grapheneos
+WORKDIR /grapheneos
+USER user
+
+#ARG TAG_NAME=14  # without "refs/tags/" because it is a branch
+ARG TAG_NAME=refs/tags/2024012600
+RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b $TAG_NAME
+
+
+#ADD https://grapheneos.org/allowed_signers /home/user/.ssh/grapheneos_allowed_signers
+#RUN --mount=type=bind,source=grapheneos_allowed_signers,target=/home/user/.ssh/grapheneos_allowed_signers \
+#  cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/home/user/.ssh/grapheneos_allowed_signers verify-tag $(git describe)
+# -> make it persistent, could be useful later
+COPY ./grapheneos_allowed_signers /home/user/.ssh/grapheneos_allowed_signers
+RUN cd .repo/manifests \
+  && git config gpg.ssh.allowedSignersFile ~/.ssh/grapheneos_allowed_signers \
+  && git verify-tag $(git describe)
+
+RUN repo sync -j8
+
