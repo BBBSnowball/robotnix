@@ -5,7 +5,9 @@ FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd473
 RUN apt update && apt install -y \
   repo python3 git gnupg
 
-RUN adduser user --disabled-password </dev/null
+#RUN adduser user --disabled-password </dev/null
+# -> might trigger a bug, see https://docs.docker.com/develop/develop-images/instructions/#user
+RUN useradd --no-log-init --create-home user
 RUN install -o user -g user -m 700 -d /grapheneos
 WORKDIR /grapheneos
 USER user

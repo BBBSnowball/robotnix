@@ -15,5 +15,7 @@ RUN --mount=type=bind,source=nodesource-repo.gpg.key,target=/tmp/nodesource-repo
   && apt update \
   && apt install -y nodejs yarn
 
-RUN adduser user --disabled-password </dev/null
+#RUN adduser user --disabled-password </dev/null
+# -> might trigger a bug, see https://docs.docker.com/develop/develop-images/instructions/#user
+RUN useradd --no-log-init --create-home user
 
