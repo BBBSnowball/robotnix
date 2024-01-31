@@ -9,9 +9,8 @@ RUN apt update && apt install -y iproute2 tig htop \
 # https://github.com/nodesource/distributions/wiki/Repository-Manual-Installation
 #RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
 #  apt install -y nodejs yarn
-COPY ./nodesource-repo.gpg.key /tmp
-RUN gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg </tmp/nodesource-repo.gpg.key \
-  && rm /tmp/nodesource-repo.gpg.key \
+RUN --mount=type=bind,source=nodesource-repo.gpg.key,target=/tmp/nodesource-repo.gpg.key \
+  gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg </tmp/nodesource-repo.gpg.key \
   && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
   && apt update \
   && apt install -y nodejs yarn
