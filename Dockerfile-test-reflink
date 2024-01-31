@@ -1,0 +1,20 @@
+FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74 as a
+FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74 as b
+
+RUN apt update && apt install -y btrfs-progs
+
+RUN mkdir /test
+COPY --from=a /bin/bash /test/bash-COPY
+RUN --mount=type=bind,from=a,target=/a \
+  cp --reflink=auto /a/bin/bash /test/bash-cp
+RUN --mount=type=bind,from=a,target=/a \
+  cp --reflink=auto /a/bin/bash /test/bash-reflink-auto
+RUN --mount=type=bind,from=a,target=/a \
+  cp --reflink=always /a/bin/bash /test/bash-reflink-always
+RUN --mount=type=bind,from=a,target=/a \
+  cp --reflink=never /a/bin/bash /test/bash-reflink-never
+
+RUN btrfs filesystem du /test
+
+# -> all but reflink=never make a reflink so we can simply use COPY
+
