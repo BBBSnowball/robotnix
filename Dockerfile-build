@@ -30,6 +30,15 @@ ENV OFFICIAL_BUILD=true
 RUN --network=none \
   bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET}"
 
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m vendorbootimage"
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m target-files-package"
+RUN rm -f done-vendorbootimage done-target-files-package
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m vendorbootimage" \
+  && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
+# If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
+# and you should immediately fall into a shell for this step (because the previous one was "successfull"
+# and has thus been cached). We allow network in here because that can be useful in the debug shell.
+RUN [ -e done-vendorbootimage ]
+
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m target-files-package" \
+  && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
+RUN [ -e done-target-files-package ]
 
