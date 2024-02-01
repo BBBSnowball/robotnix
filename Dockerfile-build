@@ -20,14 +20,16 @@ RUN --mount=type=bind,source=yarn-adevtool.sh,target=/tmp/yarn-adevtool.sh \
   /tmp/yarn-adevtool.sh
 
 RUN bash -c "source build/envsetup.sh && m aapt2"
-#FIXME Can we cache this? Current build downloads "bluejay UQ1A.240105.002 factory".
-#      -> Mount cache volume here? ./vendor/adevtool/dl
+
 # This needs `eval` because the alias for adevtool is defined by envsetup.
 RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=1000,sharing=locked \
-  bash -c "source build/envsetup.sh && eval adevtool generate-all -d $PIXEL_CODENAME"
+  --network=none \
+  bash -O expand_aliases -c "source build/envsetup.sh && eval adevtool generate-all -d $PIXEL_CODENAME"
 
 ENV OFFICIAL_BUILD=true
-RUN bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET}"
+RUN --network=none \
+  bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET}"
 
-RUN bash -c "source build/envsetup.sh && eval m vendorbootimage target-files-package"
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m vendorbootimage"
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m target-files-package"
 

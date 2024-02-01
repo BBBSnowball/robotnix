@@ -13,3 +13,7 @@ docker build --file Dockerfile-shell-start2 --tag x7 .
 docker build --file Dockerfile-build --tag x8 . --progress=plain
 docker build --file Dockerfile-save-caches --tag x9 . --build-arg cache_buster=4 && docker run -it x9 find /cache -maxdepth 2
 
+#FIXME combine many of these files and use "--target" to stop early for development
+#  https://docs.docker.com/build/building/multi-stage/#stop-at-a-specific-build-stage
+#  -> Vermutlich eins mit dem "will ich immmer neu machen" und x5 und x6 separat.
+
