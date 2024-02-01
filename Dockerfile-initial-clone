@@ -24,7 +24,7 @@ RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed
 
 # "|| true" is so we don't loose progress if it fails
 #RUN repo sync -j8 || true
-RUN repo sync -j8 --retry-fetches=3 --force-sync --network-only || true
+RUN repo sync -j8 --retry-fetches=3 --force-sync --network-only -v || true
 
 LABEL gos="src-initial"
 

@@ -1,0 +1,13 @@
+FROM x1 as tools
+
+ARG cache_buster=1
+RUN echo $cache_buster
+
+USER root
+RUN install -d -o user /cache
+
+RUN --mount=type=cache,id=yarn-pkgs,target=/x,uid=1000,sharing=locked \
+  cp -aTv /x /cache/yarn-pkgs && touch /x/dbg-$cache_buster
+RUN --mount=type=cache,id=adevtool-dl,target=/x,uid=1000,sharing=locked \
+  cp -aTv /x /cache/adevtool-dl && touch /x/dbg-$cache_buster
+

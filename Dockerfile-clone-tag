@@ -18,7 +18,10 @@ RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b $TAG_NAM
 RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed_signers \
   cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/tmp/grapheneos_allowed_signers verify-tag $(git describe)
 
-RUN repo sync -j8 --retry-fetches=3 --force-sync
+RUN repo sync -j8 --retry-fetches=3 --force-sync -v
+
+# This turned out to be necessary for some reason.
+RUN repo list | while read path _ _ ; do ( cd "$path" && git reset --hard ) ; done
 
 LABEL gos="src", tag="$TAG_NAME"
 

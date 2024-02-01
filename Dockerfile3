@@ -1,8 +1,0 @@
-FROM x1
-
-RUN install -o user -g user -m 700 -d /grapheneos-14
-WORKDIR /grapheneos-14
-USER user
-RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b 14
-RUN repo sync -j8
-

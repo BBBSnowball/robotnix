@@ -1,21 +1,33 @@
 FROM x7
 USER user
-WORKINGDIR /grapheneos
+WORKDIR /grapheneos
 
 ARG PIXEL_CODENAME=bluejay
+ARG BUILD_TARGET=user
+#ARG BUILD_TARGET=userdebug
 
-RUN ./yarn/node_modules/.bin/yarn --cwd vendor/adevtool/
-RUN source build/envsetup.sh && m aapt2
+#NOTE Here is some documentation on how the mount with type=cache works:
+# https://github.com/moby/buildkit/issues/1673#issuecomment-1264502398
+# tl;dr: caches with same id will be shared between all DockerFiles,
+#        data will be in ~/data2/gos-docker/buildkit in some form,
+#        cache can vanish at any time due to GC
+
+RUN rm -rf out
+
+#RUN /tools/yarn/node_modules/.bin/yarn --cwd vendor/adevtool/
+RUN --mount=type=bind,source=yarn-adevtool.sh,target=/tmp/yarn-adevtool.sh \
+  --mount=type=cache,id=yarn-pkgs,target=/cache/yarn-pkgs,uid=1000,sharing=locked \
+  /tmp/yarn-adevtool.sh
+
+RUN bash -c "source build/envsetup.sh && m aapt2"
 #FIXME Can we cache this? Current build downloads "bluejay UQ1A.240105.002 factory".
 #      -> Mount cache volume here? ./vendor/adevtool/dl
-RUN source build/envsetup.sh && adevtool generate-all -d $PIXEL_CODENAME
+# This needs `eval` because the alias for adevtool is defined by envsetup.
+RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=1000,sharing=locked \
+  bash -c "source build/envsetup.sh && eval adevtool generate-all -d $PIXEL_CODENAME"
 
 ENV OFFICIAL_BUILD=true
-RUN source build/envsetup.sh \
-  && lunch ${PIXEL_CODENAME}-user
-#                            ^^ or -userdebug
+RUN bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET}"
 
-RUN rm -rf out \
-  && source build/envsetup.sh \
-  && m target-files-package
+RUN bash -c "source build/envsetup.sh && eval m vendorbootimage target-files-package"
 
