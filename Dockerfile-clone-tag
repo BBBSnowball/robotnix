@@ -1,5 +1,4 @@
-#TODO better reference to result of Dockerfile-initial-clone
-FROM x5
+FROM gos-src-latest
 
 WORKDIR /grapheneos
 USER user

@@ -1,0 +1,99 @@
+###################################
+### part 1: install build tools ###
+###################################
+
+#FROM docker.io/library/ubuntu:22.04
+FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74 \
+  as build-tools
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt update && apt install -y iproute2 tig htop tmux byobu vim \
+  repo python3 git gnupg openssh-server diffutils libfreetype6 fontconfig fonts-dejavu-core libncurses5 libncurses5-dev openssl rsync unzip zip yarn e2fsprogs gperf python3-protobuf gcc-multilib signify \
+  ca-certificates curl gnupg \
+  xz-utils bzip2 m4 \
+  && apt remove -v cmdtest
+# (cmdtest has a yarn binary but not the one that we need)
+
+# https://github.com/nodesource/distributions?tab=readme-ov-file#using-ubuntu-2
+# https://github.com/nodesource/distributions/wiki/Repository-Manual-Installation
+#RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
+#  apt install -y nodejs yarnpkg
+RUN --mount=type=bind,source=nodesource-repo.gpg.key,target=/tmp/nodesource-repo.gpg.key \
+  gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg </tmp/nodesource-repo.gpg.key \
+  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+  && apt update \
+  && apt install -y nodejs
+
+#RUN adduser user --disabled-password </dev/null
+# -> might trigger a bug, see https://docs.docker.com/develop/develop-images/instructions/#user
+RUN useradd --no-log-init --create-home --shell /bin/bash user
+
+RUN install -d -o user /tools
+USER user
+RUN mkdir /tools/yarn \
+  && cd /tools/yarn \
+  && npm install --user yarn
+
+################################################
+### part 2: combine build tools with sources ###
+################################################
+
+# copy tools into src image because tools are smaller than src
+FROM gos-src-latest as src
+
+RUN rm -rf bin  boot  dev  etc  home  lib  lib32  lib64  libx32  media  mnt  nix  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+COPY --from=build-tools / /
+
+################################################
+### part 3: build plain upstream variant     ###
+################################################
+
+FROM src as build-a1
+USER user
+WORKDIR /grapheneos
+
+ARG PIXEL_CODENAME=bluejay
+ARG BUILD_TARGET=user
+#ARG BUILD_TARGET=userdebug
+
+#NOTE Here is some documentation on how the mount with type=cache works:
+# https://github.com/moby/buildkit/issues/1673#issuecomment-1264502398
+# tl;dr: caches with same id will be shared between all DockerFiles,
+#        data will be in ~/data2/gos-docker/buildkit in some form,
+#        cache can vanish at any time due to GC
+
+RUN rm -rf out done-*
+
+#RUN /tools/yarn/node_modules/.bin/yarn --cwd vendor/adevtool/
+RUN --mount=type=bind,source=yarn-adevtool.sh,target=/tmp/yarn-adevtool.sh \
+  --mount=type=cache,id=yarn-pkgs,target=/cache/yarn-pkgs,uid=1000,sharing=locked \
+  /tmp/yarn-adevtool.sh
+
+RUN bash -c "source build/envsetup.sh && m aapt2"
+
+# This needs `eval` because the alias for adevtool is defined by envsetup.
+RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=1000,sharing=locked \
+  --network=none \
+  bash -O expand_aliases -c "source build/envsetup.sh && eval adevtool generate-all -d $PIXEL_CODENAME"
+
+ENV OFFICIAL_BUILD=true
+RUN --network=none \
+  bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET}"
+
+FROM build-a1 as build-a2
+
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m vendorbootimage" \
+  && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
+# If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
+# and you should immediately fall into a shell for this step (because the previous one was "successfull"
+# and has thus been cached). We allow network in here because that can be useful in the debug shell.
+FROM build-a2 as build-a3
+RUN [ -e done-vendorbootimage ]
+
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m target-files-package" \
+  && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
+FROM build-a3 as build-a4
+RUN [ -e done-target-files-package ]
+
+FROM build-a4 as build-a
+

@@ -1,6 +1,0 @@
-# copy tools into src image because tools are smaller than src
-FROM x1 as tools
-FROM x6 as src
-
-RUN rm -rf bin  boot  dev  etc  home  lib  lib32  lib64  libx32  media  mnt  nix  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
-COPY --from=tools / /
