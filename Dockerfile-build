@@ -1,0 +1,21 @@
+FROM x7
+USER user
+WORKINGDIR /grapheneos
+
+ARG PIXEL_CODENAME=bluejay
+
+RUN ./yarn/node_modules/.bin/yarn --cwd vendor/adevtool/
+RUN source build/envsetup.sh && m aapt2
+#FIXME Can we cache this? Current build downloads "bluejay UQ1A.240105.002 factory".
+#      -> Mount cache volume here? ./vendor/adevtool/dl
+RUN source build/envsetup.sh && adevtool generate-all -d $PIXEL_CODENAME
+
+ENV OFFICIAL_BUILD=true
+RUN source build/envsetup.sh \
+  && lunch ${PIXEL_CODENAME}-user
+#                            ^^ or -userdebug
+
+RUN rm -rf out \
+  && source build/envsetup.sh \
+  && m target-files-package
+

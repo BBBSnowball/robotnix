@@ -1,0 +1,4 @@
+FROM x6 as src
+FROM x1 as tools
+
+COPY --from=src /grapheneos /grapheneos

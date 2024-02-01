@@ -1,0 +1,24 @@
+#TODO better reference to result of Dockerfile-initial-clone
+FROM x5
+
+WORKDIR /grapheneos
+USER user
+
+RUN git config --global user.email x \
+  && git config --global user.name x
+
+#ARG TAG_NAME=14  # without "refs/tags/" because it is a branch
+#ARG TAG_NAME=refs/tags/2024012600
+ARG TAG_NAME=refs/tags/2024011600
+RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b $TAG_NAME
+# or: python3 -- /grapheneos/.repo/repo/repo init -u https://github.com/GrapheneOS/platform_manifest.git -b refs/tags/2024011600
+
+#ADD https://grapheneos.org/allowed_signers /home/user/.ssh/grapheneos_allowed_signers
+# don't make it persistent because we won't copy $HOME from this image
+RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed_signers \
+  cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/tmp/grapheneos_allowed_signers verify-tag $(git describe)
+
+RUN repo sync -j8 --retry-fetches=3 --force-sync
+
+LABEL gos="src", tag="$TAG_NAME"
+

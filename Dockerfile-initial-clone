@@ -18,13 +18,13 @@ RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b $TAG_NAM
 
 
 #ADD https://grapheneos.org/allowed_signers /home/user/.ssh/grapheneos_allowed_signers
-#RUN --mount=type=bind,source=grapheneos_allowed_signers,target=/home/user/.ssh/grapheneos_allowed_signers \
-#  cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/home/user/.ssh/grapheneos_allowed_signers verify-tag $(git describe)
-# -> make it persistent, could be useful later
-COPY ./grapheneos_allowed_signers /home/user/.ssh/grapheneos_allowed_signers
-RUN cd .repo/manifests \
-  && git config gpg.ssh.allowedSignersFile ~/.ssh/grapheneos_allowed_signers \
-  && git verify-tag $(git describe)
+# don't make it persistent because we won't copy $HOME from this image
+RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed_signers \
+  cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/tmp/grapheneos_allowed_signers verify-tag $(git describe)
 
-RUN repo sync -j8
+# "|| true" is so we don't loose progress if it fails
+#RUN repo sync -j8 || true
+RUN repo sync -j8 --retry-fetches=3 --force-sync --network-only || true
+
+LABEL gos="src-initial"
 

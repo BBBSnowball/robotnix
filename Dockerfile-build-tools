@@ -1,21 +1,29 @@
 #FROM docker.io/library/ubuntu:22.04
 FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd47341e4d431118c7dd060a74
 
-RUN apt update && apt install -y iproute2 tig htop \
+RUN apt update && apt install -y iproute2 tig htop tmux byobu vim \
   repo python3 git gnupg openssh-server diffutils libfreetype6 fontconfig fonts-dejavu-core libncurses5-dev openssl rsync unzip zip yarn e2fsprogs gperf python3-protobuf gcc-multilib signify \
-  ca-certificates curl gnupg
+  ca-certificates curl gnupg \
+  && apt remove -v cmdtest
+# (cmdtest has a yarn binary but not the one that we need)
 
 # https://github.com/nodesource/distributions?tab=readme-ov-file#using-ubuntu-2
 # https://github.com/nodesource/distributions/wiki/Repository-Manual-Installation
 #RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
-#  apt install -y nodejs yarn
+#  apt install -y nodejs yarnpkg
 RUN --mount=type=bind,source=nodesource-repo.gpg.key,target=/tmp/nodesource-repo.gpg.key \
   gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg </tmp/nodesource-repo.gpg.key \
   && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
   && apt update \
-  && apt install -y nodejs yarn
+  && apt install -y nodejs
 
 #RUN adduser user --disabled-password </dev/null
 # -> might trigger a bug, see https://docs.docker.com/develop/develop-images/instructions/#user
-RUN useradd --no-log-init --create-home user
+RUN useradd --no-log-init --create-home --shell /bin/bash user
+
+RUN install -d -o user /tools
+USER user
+RUN mkdir /tools/yarn \
+  && cd /tools/yarn \
+  && npm install --user yarn
 
