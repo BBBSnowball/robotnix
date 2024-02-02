@@ -69,6 +69,8 @@ RUN --mount=type=bind,source=yarn-adevtool.sh,target=/tmp/yarn-adevtool.sh \
   --mount=type=cache,id=yarn-pkgs,target=/cache/yarn-pkgs,uid=1000,sharing=locked \
   /tmp/yarn-adevtool.sh
 
+# time taken: ~10 min
+# (on Framework Laptop with i7-1185G7)
 RUN bash -c "source build/envsetup.sh && m aapt2"
 
 # This needs `eval` because the alias for adevtool is defined by envsetup.
@@ -82,6 +84,7 @@ RUN --network=none \
 
 FROM build-a1 as build-a2
 
+# time taken: ~5 min
 RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m vendorbootimage" \
   && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
 # If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
@@ -90,6 +93,7 @@ RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m
 FROM build-a2 as build-a3
 RUN [ -e done-vendorbootimage ]
 
+# time taken: 17000 sec = 4.7 h
 RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m target-files-package" \
   && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
 FROM build-a3 as build-a4
