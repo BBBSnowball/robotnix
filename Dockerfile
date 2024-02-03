@@ -80,7 +80,7 @@ RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=
 
 FROM build-a1 as build-a2
 
-# time taken: ~5 min
+# time taken: ~7 min
 RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m vendorbootimage" \
   && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
 # If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
@@ -99,11 +99,43 @@ RUN [ -e done-target-files-package ]
 RUN --network=none \
   bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && m otatools-package"
 
+FROM build-a4 as build-a
+
+
+
+FROM build-a as build-b1
+
+ARG robotnixPatchScript=""
+RUN --network=none \
+  --mount=type=bind,source=/nix,target=/nix \
+  if [ -n "$robotnixPatchScript=" ] ; then "$robotnixPatchScript" ; fi
+FROM build-b1 as build-b2
+
+# time taken: ~7 min ?
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m vendorbootimage" \
+  && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
+# If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
+# and you should immediately fall into a shell for this step (because the previous one was "successfull"
+# and has thus been cached). We allow network in here because that can be useful in the debug shell.
+FROM build-b2 as build-b3
+RUN [ -e done-vendorbootimage ]
+
+# time taken: 17000 sec = 4.7 h ?
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m target-files-package" \
+  && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
+FROM build-b3 as build-b4
+RUN [ -e done-target-files-package ]
+
+# time taken: ~2 min ?
+RUN --network=none \
+  bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && m otatools-package"
+
+FROM build-b4 as build-b5
+
 # time taken: TODO
 #RUN --network=none \
 #  --mount=type=bind,source=./keys,target=/grapheneos/keys
 #  script/release.sh bluejay
-#  time OUT=out/target/product/emulator_x86_64 ./script/release.sh bluejay
 
-FROM build-a4 as build-a
+FROM build-b5 as build-b
 

@@ -38,6 +38,11 @@ else
 fi
 
 echo "== build it =="
-time ( set -x; docker build --file Dockerfile --tag "gos-build-$tag" . --progress=plain "$@" )
+time ( set -x; docker build --file Dockerfile --tag "gos-build-$tag" . --progress=plain "$@" --target build-a )
 (set -x; docker image tag "gos-build-$tag" gos-build-latest )
+
+echo "== build with patches =="
+( set -x; nix-build groot-main.nix -A config.build.unpackScript3 -o result-unpackScript3 )
+time ( set -x; docker build --file Dockerfile --tag "gos-build2-$tag" . --progress=plain "$@" --build-arg robotnixPatchScript="$(realpath ./result-unpackScript3)" )
+(set -x; docker image tag "gos-build2-$tag" gos-build-latest )
 
