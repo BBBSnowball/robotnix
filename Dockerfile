@@ -71,21 +71,17 @@ RUN --mount=type=bind,source=yarn-adevtool.sh,target=/tmp/yarn-adevtool.sh \
 
 # time taken: ~10 min
 # (on Framework Laptop with i7-1185G7)
-RUN bash -c "source build/envsetup.sh && m aapt2"
+RUN --network=none \
+  bash -c "source build/envsetup.sh && m aapt2"
 
 # This needs `eval` because the alias for adevtool is defined by envsetup.
 RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=1000,sharing=locked \
-  --network=none \
   bash -O expand_aliases -c "source build/envsetup.sh && eval adevtool generate-all -d $PIXEL_CODENAME"
-
-ENV OFFICIAL_BUILD=true
-RUN --network=none \
-  bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET}"
 
 FROM build-a1 as build-a2
 
 # time taken: ~5 min
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m vendorbootimage" \
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m vendorbootimage" \
   && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
 # If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
 # and you should immediately fall into a shell for this step (because the previous one was "successfull"
@@ -94,10 +90,20 @@ FROM build-a2 as build-a3
 RUN [ -e done-vendorbootimage ]
 
 # time taken: 17000 sec = 4.7 h
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval m target-files-package" \
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m target-files-package" \
   && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
 FROM build-a3 as build-a4
 RUN [ -e done-target-files-package ]
+
+# time taken: ~2 min
+RUN --network=none \
+  bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && m otatools-package"
+
+# time taken: TODO
+#RUN --network=none \
+#  --mount=type=bind,source=./keys,target=/grapheneos/keys
+#  script/release.sh bluejay
+#  time OUT=out/target/product/emulator_x86_64 ./script/release.sh bluejay
 
 FROM build-a4 as build-a
 
