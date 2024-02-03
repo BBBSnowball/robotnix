@@ -37,11 +37,39 @@ Build it
         - You can build only part of it with `--target` (see [documentation](https://docs.docker.com/build/building/multi-stage/#stop-at-a-specific-build-stage)),
           e.g. this will start a shell with build tools and the source tree (in `/grapheneos`) without building anything
           (using sources from `gos-src-latest`):
-          `docker build --file Dockerfile . --target src --tag x && docker run -it x`
+          `docker build --file Dockerfile . --target src --tag x && docker run --rm -it x`
         - You can run a container with a bind mount for `/nix`:
           `docker run -it --mount type=bind,source=/nix,target=/nix ubuntu:22.04`
     b. Save contents of caches in an image:
        `docker build --file Dockerfile-save-caches --tag gos-caches . --build-arg cache_buster=$num && docker run -it gos-caches find /cache -maxdepth 2`
+
+TODO (maybe)
+============
+
+- sign release
+- copy factory and ota zips out of the final image
+- generate differential updates
+- apply some things from robotnix:
+    - idea: build the config attrset and then implement some of the low-level things
+      (and extract the relevant parts so we can change some setting and see whether this changes anything that we support)
+    - set URL of update server in packages/apps/Updater/res/values/config.xml
+    - install Bromite in addition to Vanadium (adblock, user scripts) but keep Vanadium for webview
+    - fdroid
+    - signature spoofing ?
+- add to robotnix?
+    - pre-approve adb keys
+    - root (see below)
+    - wifi credentials
+    - backup url for wizard
+- allow root for adb (which is enough, for now)
+    - userdebug build might already allow this
+    - su looks at some property that we can change
+- remote attestation for access to backups
+- somehow backup/sync browser bookmarks
+    - ideally to some sort of Zettelkasten
+- also build the parts that we don't change (just because we can):
+    - build kernel, see https://grapheneos.org/build#kernel-6th-generation-pixels
+    - build Vanadium, see https://grapheneos.org/build#browser-and-webview
 
 Some random notes
 =================

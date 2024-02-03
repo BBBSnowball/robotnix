@@ -33,10 +33,11 @@ else
   fi
 
   echo "== fetching sources for $tag_long (starting with $newest_src) =="
-  ( set -x; docker build --file Dockerfile-clone-tag --tag gos-src-$tag . --progres=plain --build-arg TAG_NAME="$tag_long" )
-  ( set -x; docker image tag gos-src-$tag gos-src-latest )
+  ( set -x; docker build --file Dockerfile-clone-tag --tag "gos-src-$tag" . --progres=plain --build-arg TAG_NAME="$tag_long" )
+  ( set -x; docker image tag "gos-src-$tag" gos-src-latest )
 fi
 
 echo "== build it =="
 time ( set -x; docker build --file Dockerfile --tag "gos-build-$tag" . --progress=plain "$@" )
+(set -x; docker image tag "gos-build-$tag" gos-build-latest )
 

@@ -17,10 +17,31 @@ RUN repo init -u https://github.com/GrapheneOS/platform_manifest.git -b $TAG_NAM
 RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed_signers \
   cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/tmp/grapheneos_allowed_signers verify-tag $(git describe)
 
-RUN repo sync -j8 --retry-fetches=3 --force-sync -v
+# `--optimized-fetch` avoids asking the remote repo if we already know the commit hash and have that commit.
+# Manifests for release tags are generated with `repo manifest -r`, i.e. we know all the hashes, so we can
+# quickly skip any repos that haven't changed. If nothing has changed this makes a difference of 17 sec vs 90 sec.
+RUN repo sync -j8 --retry-fetches=3 --force-sync -v --optimized-fetch
 
 # This turned out to be necessary for some reason.
 RUN repo list | while read path _ _ ; do ( cd "$path" && git reset --hard ) ; done
 
+
+# same thing for the kernel
+#RUN mkdir -p android/kernel/bluejay
+#WORKdir /grapheneos/android/kernel/bluejay
+#RUN repo init -u https://github.com/GrapheneOS/kernel_manifest-bluejay.git -b $TAG_NAME
+#RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed_signers \
+#  cd .repo/manifests && git -c gpg.ssh.allowedSignersFile=/tmp/grapheneos_allowed_signers verify-tag $(git describe)
+#RUN repo sync -j8 --retry-fetches=3 --force-sync -v --optimized-fetch
+#RUN repo list | while read path _ _ ; do ( cd "$path" && git reset --hard ) ; done
+
+# and Vanadium
+#WORKDIR /grapheneos
+#RUN [ -e Vanadium ] || git clone https://github.com/GrapheneOS/Vanadium.git -b $TAG_NAME
+#WORKDIR /grapheneos/Vanadium
+#RUN git fetch origin $TAG_NAME && git reset --hard $TAG_NAME
+#...
+
+WORKDIR /grapheneos
 LABEL gos="src", tag="$TAG_NAME"
 
