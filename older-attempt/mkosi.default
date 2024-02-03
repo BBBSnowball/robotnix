@@ -1,0 +1,12 @@
+[Distribution]
+Distribution=ubuntu
+#Release=24
+
+[Output]
+Format=directory
+
+[Packages]
+# The packages to appear in both the build and the final image
+Packages=repo git gnupg build-essential yarn gperf signify python-protobuf
+# The packages to appear in the build image, but absent from the final image
+BuildPackages=
