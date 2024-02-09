@@ -69,7 +69,7 @@ RUN --mount=type=bind,source=yarn-adevtool.sh,target=/tmp/yarn-adevtool.sh \
   --mount=type=cache,id=yarn-pkgs,target=/cache/yarn-pkgs,uid=1000,sharing=locked \
   /tmp/yarn-adevtool.sh
 
-# time taken: ~10 min
+# time taken: ~11 min
 # (on Framework Laptop with i7-1185G7)
 RUN --network=none \
   bash -c "source build/envsetup.sh && m aapt2"
@@ -80,7 +80,7 @@ RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=
 
 FROM build-a1 as build-a2
 
-# time taken: ~7 min
+# time taken: ~13 min
 RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m vendorbootimage" \
   && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
 # If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
@@ -108,7 +108,7 @@ FROM build-a as build-b1
 ARG robotnixPatchScript=""
 RUN --network=none \
   --mount=type=bind,source=/nix,target=/nix \
-  if [ -n "$robotnixPatchScript=" ] ; then "$robotnixPatchScript" ; fi
+  if [ -n "$robotnixPatchScript" ] ; then "$robotnixPatchScript" ; fi
 FROM build-b1 as build-b2
 
 # time taken: ~7 min ?
