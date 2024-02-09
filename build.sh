@@ -33,7 +33,7 @@ else
   fi
 
   echo "== fetching sources for $tag_long (starting with $newest_src) =="
-  ( set -x; docker build --file Dockerfile-clone-tag --tag "gos-src-$tag" . --progres=plain --build-arg TAG_NAME="$tag_long" )
+  ( set -x; docker build --file Dockerfile-clone-tag --tag "gos-src-$tag" . --progress=plain --build-arg TAG_NAME="$tag_long" )
   ( set -x; docker image tag "gos-src-$tag" gos-src-latest )
 fi
 
