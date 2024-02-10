@@ -47,6 +47,11 @@ TODO (maybe)
 ============
 
 - sign release
+    - FIXME We need signify-openbsd because signify doesn't support `-S`. Workaround:
+      `apt remove signify && apt install signify-openbsd && ln -s signify-openbsd /usr/bin/signify`
+    - FIXME Fingerprint of AVB should be the sha256 of the AVB public key but that doesn't match, for me.
+      https://source.android.com/docs/security/features/verifiedboot/boot-flow#unlocked-devices
+      https://github.com/nix-community/robotnix/blob/f941a20537384418c22000f6e6487c92441e0a7f/docs/src/modules/attestation.md?plain=1#L52C7-L52C42
 - copy factory and ota zips out of the final image
 - generate differential updates
 - apply some things from robotnix:
@@ -61,8 +66,10 @@ TODO (maybe)
     - pre-approve adb keys
     - root (see below)
     - wifi credentials
-    - backup url for new device wizard
+    - backup url for setup wizard
     - patch seedvault to lie and say that it wants to move data to a new device, which allows making a backup of more apps
+        - NOTE: SeedVault doesn't appear as an app. Search for backup in settings.
+        - There is an experimental setting for "device-to-device" backups. Nice!
 - allow root for adb (which is enough, for now)
     - userdebug build might already allow this
     - su looks at some property that we can change
@@ -74,6 +81,16 @@ TODO (maybe)
 - also build the parts that we don't change (just because we can):
     - build kernel, see https://grapheneos.org/build#kernel-6th-generation-pixels
     - build Vanadium, see https://grapheneos.org/build#browser-and-webview
+- activate torch by long-press on power button
+    - e.g. see https://review.lineageos.org/c/LineageOS/android_frameworks_base/+/320847/20/services/core/java/com/android/server/policy/PhoneWindowManager.java
+    - /grapheneos/frameworks/base/core/res/res/values/config.xml
+        - `config_longPressOnPowerBehavior = 6`
+        - `config_longPressOnPowerDurationMs = 300`
+        - `config_longPressOnPowerForAssistantSettingAvailable = true`
+        - `config_veryLongPressOnPowerBehavior = 1`
+    - /grapheneos/frameworks/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
+        - [in LineageOS](https://github.com/LineageOS/android_frameworks_base/blob/lineage-20.0/services/core/java/com/android/server/policy/PhoneWindowManager.java)
+        - mDeviceKeyHandlers loaded via PathClassLoader - could be useful to add key handlers in external code
 
 Some random notes
 =================
@@ -106,4 +123,10 @@ Interesting ones:
 
 nix eval --expr '(import ./robotnix { configuration = ./config.nix; }).config.build.unpackScript2' --impure --raw
 nix-build --expr '(import ./robotnix { configuration = ./config.nix; }).config.build.unpackScript3'
+
+https://source.android.com/docs/setup/build/building
+-> use `mma` to build a subdir
+
+very helpful when editing diffs: patchutils: rediff and recountdiff
+(https://stackoverflow.com/a/34431351)
 
