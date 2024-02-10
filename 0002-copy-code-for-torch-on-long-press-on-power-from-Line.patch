@@ -1,0 +1,311 @@
+From 1cb1ad5cf1fe153614588890469441069c4f6c18 Mon Sep 17 00:00:00 2001
+From: x <x>
+Date: Fri, 9 Feb 2024 22:57:04 +0000
+Subject: [PATCH 2/3] copy code for torch on long press on power from LineageOS
+
+---
+ .../server/policy/PhoneWindowManager.java     | 168 +++++++++++++++++-
+ 1 file changed, 167 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/policy/PhoneWindowManager.java b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+index 0449682199c9..5e03ced523e2 100644
+--- a/services/core/java/com/android/server/policy/PhoneWindowManager.java
++++ b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+@@ -98,9 +98,11 @@ import android.app.ActivityManager;
+ import android.app.ActivityManager.RecentTaskInfo;
+ import android.app.ActivityManagerInternal;
+ import android.app.ActivityTaskManager;
++import android.app.AlarmManager;
+ import android.app.AppOpsManager;
+ import android.app.IUiModeManager;
+ import android.app.NotificationManager;
++import android.app.PendingIntent;
+ import android.app.ProgressDialog;
+ import android.app.SearchManager;
+ import android.app.UiModeManager;
+@@ -121,6 +123,9 @@ import android.content.res.Resources;
+ import android.database.ContentObserver;
+ import android.graphics.Rect;
+ import android.hardware.SensorPrivacyManager;
++import android.hardware.camera2.CameraAccessException;
++import android.hardware.camera2.CameraCharacteristics;
++import android.hardware.camera2.CameraManager;
+ import android.hardware.display.DisplayManager;
+ import android.hardware.display.DisplayManagerInternal;
+ import android.hardware.hdmi.HdmiAudioSystemClient;
+@@ -285,6 +290,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     static final int LONG_PRESS_POWER_SHUT_OFF_NO_CONFIRM = 3;
+     static final int LONG_PRESS_POWER_GO_TO_VOICE_ASSIST = 4;
+     static final int LONG_PRESS_POWER_ASSISTANT = 5; // Settings.Secure.ASSISTANT
++    static final int LONG_PRESS_POWER_TORCH = 6;
+ 
+     // must match: config_veryLongPresOnPowerBehavior in config.xml
+     static final int VERY_LONG_PRESS_POWER_NOTHING = 0;
+@@ -365,6 +371,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     private static final VibrationAttributes HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES =
+             VibrationAttributes.createForUsage(VibrationAttributes.USAGE_HARDWARE_FEEDBACK);
+ 
++    private static final String ACTION_TORCH_OFF =
++            "com.android.server.policy.PhoneWindowManager.ACTION_TORCH_OFF";
++
+     /**
+      * Keyguard stuff
+      */
+@@ -434,6 +443,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     AccessibilityManagerInternal mAccessibilityManagerInternal;
+     BurnInProtectionHelper mBurnInProtectionHelper;
+     private DisplayFoldController mDisplayFoldController;
++    AlarmManager mAlarmManager;
+     AppOpsManager mAppOpsManager;
+     PackageManager mPackageManager;
+     SideFpsEventHandler mSideFpsEventHandler;
+@@ -620,6 +630,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     // Whether to support long press from power button in non-interactive mode
+     private boolean mSupportLongPressPowerWhenNonInteractive;
+ 
++    // Power long press action saved on key down that should happen on key up
++    private int mResolvedLongPressOnPowerBehavior;
++
+     // Whether to go to sleep entering theater mode from power button
+     private boolean mGoToSleepOnButtonPressTheaterMode;
+ 
+@@ -690,6 +703,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     private static final int MSG_SWITCH_KEYBOARD_LAYOUT = 25;
+     private static final int MSG_LOG_KEYBOARD_SYSTEM_EVENT = 26;
+ 
++    // Lineage additions
++    private static final int MSG_TOGGLE_TORCH = 100;
++    private static final int MSG_CAMERA_LONG_PRESS = 101;
++
++    private CameraManager mCameraManager;
++    private String mRearFlashCameraId;
++    private boolean mTorchLongPressPowerEnabled;
++    private boolean mTorchEnabled;
++    private int mTorchTimeout;
++    private PendingIntent mTorchOffPendingIntent;
++
+     private class PolicyHandler extends Handler {
+         @Override
+         public void handleMessage(Message msg) {
+@@ -829,6 +853,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+             resolver.registerContentObserver(Settings.Secure.getUriFor(
+                     Settings.Secure.STYLUS_BUTTONS_ENABLED), false, this,
+                     UserHandle.USER_ALL);
++            //resolver.registerContentObserver(LineageSettings.System.getUriFor(
++            //        LineageSettings.System.TORCH_LONG_PRESS_POWER_GESTURE), false, this,
++            //        UserHandle.USER_ALL);
++            //resolver.registerContentObserver(LineageSettings.System.getUriFor(
++            //        LineageSettings.System.TORCH_LONG_PRESS_POWER_TIMEOUT), false, this,
++            //        UserHandle.USER_ALL);
+             updateSettings();
+         }
+ 
+@@ -980,8 +1010,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         mPowerKeyHandled = mPowerKeyHandled || hungUp
+                 || handledByPowerManager || mKeyCombinationManager.isPowerKeyIntercepted();
+         if (!mPowerKeyHandled) {
++            mResolvedLongPressOnPowerBehavior = getResolvedLongPressOnPowerBehavior();
+             if (!interactive) {
+-                wakeUpFromPowerKey(event.getDownTime());
++                if ((event.getFlags() & KeyEvent.FLAG_LONG_PRESS) != 0) {
++                    wakeUpFromPowerKey(event.getDownTime());
++                } else if (mSupportLongPressPowerWhenNonInteractive &&
++                        hasLongPressOnPowerBehavior()) {
++                    if (mResolvedLongPressOnPowerBehavior != LONG_PRESS_POWER_TORCH) {
++                        wakeUpFromPowerKey(event.getDownTime());
++                    }
++                }
+             }
+         } else {
+             // handled by another power key policy.
+@@ -999,6 +1037,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+             if ((event.getFlags() & KeyEvent.FLAG_LONG_PRESS) == 0) {
+                 // Abort possibly stuck animations only when power key up without long press case.
+                 mHandler.post(mWindowManagerFuncs::triggerAnimationFailsafe);
++                // See if we deferred screen wake because long press power for torch is enabled
++                if (mResolvedLongPressOnPowerBehavior == LONG_PRESS_POWER_TORCH &&
++                        (!isScreenOn() || isDozeMode())) {
++                    wakeUpFromPowerKey(SystemClock.uptimeMillis());
++                }
+             }
+         }
+ 
+@@ -1303,6 +1346,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+                 launchAssistAction(null, powerKeyDeviceId, eventTime,
+                         AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS);
+                 break;
++            case LONG_PRESS_POWER_TORCH:
++                mPowerKeyHandled = true;
++                // Toggle torch state asynchronously to help protect against
++                // a misbehaving cameraservice from blocking systemui.
++                mHandler.removeMessages(MSG_TOGGLE_TORCH);
++                Message msg = mHandler.obtainMessage(MSG_TOGGLE_TORCH);
++                msg.setAsynchronous(true);
++                msg.sendToTarget();
++                break;
+         }
+     }
+ 
+@@ -1352,10 +1404,26 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         }
+     }
+ 
++    private boolean isDozeMode() {
++        IDreamManager dreamManager = getDreamManager();
++
++        try {
++            if (dreamManager != null && dreamManager.isDreaming()) {
++                return true;
++            }
++        } catch (RemoteException e) {
++            Slog.e(TAG, "RemoteException when checking if dreaming", e);
++        }
++        return false;
++    }
++
+     private int getResolvedLongPressOnPowerBehavior() {
+         if (FactoryTest.isLongPressOnPowerOffEnabled()) {
+             return LONG_PRESS_POWER_SHUT_OFF_NO_CONFIRM;
+         }
++        if (mTorchLongPressPowerEnabled && (!isScreenOn() || isDozeMode() || mTorchEnabled)) {
++            return LONG_PRESS_POWER_TORCH;
++        }
+ 
+         // If the config indicates the assistant behavior but the device isn't yet provisioned, show
+         // global actions instead.
+@@ -2114,6 +2182,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         mSettingsObserver = new SettingsObserver(mHandler);
+         mSettingsObserver.observe();
+         mModifierShortcutManager = new ModifierShortcutManager(mContext, mHandler);
++
++        // Lineage additions
++        mAlarmManager = mContext.getSystemService(AlarmManager.class);
++        mCameraManager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
++        mCameraManager.registerTorchCallback(new TorchModeCallback(), mHandler);
++
+         mUiMode = mContext.getResources().getInteger(
+                 com.android.internal.R.integer.config_defaultUiModeType);
+         mHomeIntent =  new Intent(Intent.ACTION_MAIN, null);
+@@ -2292,6 +2366,23 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         initKeyCombinationRules();
+         initSingleKeyGestureRules();
+         mSideFpsEventHandler = new SideFpsEventHandler(mContext, mHandler, mPowerManager);
++
++        // Register for torch off events
++        BroadcastReceiver torchReceiver = new BroadcastReceiver() {
++            @Override
++            public void onReceive(Context context, Intent intent) {
++                mTorchOffPendingIntent = null;
++                if (mTorchEnabled) {
++                    mHandler.removeMessages(MSG_TOGGLE_TORCH);
++                    Message msg = mHandler.obtainMessage(MSG_TOGGLE_TORCH);
++                    msg.setAsynchronous(true);
++                    msg.sendToTarget();
++                }
++            }
++        };
++        filter = new IntentFilter();
++        filter.addAction(ACTION_TORCH_OFF);
++        mContext.registerReceiver(torchReceiver, filter);
+     }
+ 
+     private void initKeyCombinationRules() {
+@@ -2631,6 +2722,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+                 mRingerToggleChord = VOLUME_HUSH_OFF;
+             }
+ 
++	    //mTorchLongPressPowerEnabled = LineageSettings.System.getIntForUser(
++            //        resolver, LineageSettings.System.TORCH_LONG_PRESS_POWER_GESTURE, 0,
++            //        UserHandle.USER_CURRENT) == 1;
++            //mTorchTimeout = LineageSettings.System.getIntForUser(
++            //        resolver, LineageSettings.System.TORCH_LONG_PRESS_POWER_TIMEOUT, 0,
++            //        UserHandle.USER_CURRENT);
++            mTorchLongPressPowerEnabled = true;
++            mTorchTimeout = 300;
++
+             // Configure wake gesture.
+             boolean wakeGestureEnabledSetting = Settings.Secure.getIntForUser(resolver,
+                     Settings.Secure.WAKE_GESTURE_ENABLED, 0,
+@@ -6266,6 +6366,70 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         mHandler.getLooper().dump(new PrintWriterPrinter(pw), prefix + "  ");
+     }
+ 
++    private void cancelTorchOff() {
++        if (mTorchOffPendingIntent != null) {
++            mAlarmManager.cancel(mTorchOffPendingIntent);
++            mTorchOffPendingIntent = null;
++        }
++    }
++
++    private void toggleTorch() {
++        cancelTorchOff();
++        final boolean origEnabled = mTorchEnabled;
++        try {
++            final String rearFlashCameraId = getRearFlashCameraId();
++            if (rearFlashCameraId != null) {
++                mCameraManager.setTorchMode(rearFlashCameraId, !mTorchEnabled);
++                mTorchEnabled = !mTorchEnabled;
++            }
++        } catch (CameraAccessException e) {
++            // Ignore
++        }
++        // Setup torch off alarm
++        if (mTorchEnabled && !origEnabled && mTorchTimeout > 0) {
++            Intent torchOff = new Intent(ACTION_TORCH_OFF);
++            torchOff.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY
++                    | Intent.FLAG_RECEIVER_FOREGROUND);
++            mTorchOffPendingIntent = PendingIntent.getBroadcast(mContext, 0, torchOff,
++                    PendingIntent.FLAG_IMMUTABLE);
++            mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
++                    SystemClock.elapsedRealtime() + mTorchTimeout * 1000, mTorchOffPendingIntent);
++        }
++    }
++
++    private String getRearFlashCameraId() throws CameraAccessException {
++        if (mRearFlashCameraId != null) return mRearFlashCameraId;
++        for (final String id : mCameraManager.getCameraIdList()) {
++            CameraCharacteristics c = mCameraManager.getCameraCharacteristics(id);
++            Boolean flashAvailable = c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
++            Integer lensFacing = c.get(CameraCharacteristics.LENS_FACING);
++            if (flashAvailable != null && flashAvailable
++                    && lensFacing != null && lensFacing == CameraCharacteristics.LENS_FACING_BACK) {
++                mRearFlashCameraId = id;
++                break;
++            }
++        }
++        return mRearFlashCameraId;
++    }
++
++    private class TorchModeCallback extends CameraManager.TorchCallback {
++        @Override
++        public void onTorchModeChanged(String cameraId, boolean enabled) {
++            if (!cameraId.equals(mRearFlashCameraId)) return;
++            mTorchEnabled = enabled;
++            if (!mTorchEnabled) {
++                cancelTorchOff();
++            }
++        }
++
++        @Override
++        public void onTorchModeUnavailable(String cameraId) {
++            if (!cameraId.equals(mRearFlashCameraId)) return;
++            mTorchEnabled = false;
++            cancelTorchOff();
++        }
++    }
++
+     private static String endcallBehaviorToString(int behavior) {
+         StringBuilder sb = new StringBuilder();
+         if ((behavior & Settings.System.END_BUTTON_BEHAVIOR_HOME) != 0 ) {
+@@ -6372,6 +6536,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+                 return "LONG_PRESS_POWER_GO_TO_VOICE_ASSIST";
+             case LONG_PRESS_POWER_ASSISTANT:
+                 return "LONG_PRESS_POWER_ASSISTANT";
++            case LONG_PRESS_POWER_TORCH:
++                return "LONG_PRESS_POWER_TORCH";
+             default:
+                 return Integer.toString(behavior);
+         }
+-- 
+2.34.1
+

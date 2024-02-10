@@ -17,6 +17,8 @@ Build it
         - Set `BUILDKIT_STEP_LOG_MAX_SIZE` and `BUILDKIT_STEP_LOG_MAX_SPEED` for the Docker daemon
           (or create a new builder with these settings and use it for all the Docker commands here).
         - Test with: `docker build --file Dockerfile-test-log-limit . --progress=plain --no-cache`
+    c. Mount Nix store into build context:
+        `mkdir nix/store && sudo mount --bind /nix/store ./nix/store`
 2. Run build:
     a. Choose tag: `tag=2024011600` or `tag=$(./get-latest-release.sh)`
     b. `./build.sh $tag`. This will run these steps for you:
@@ -49,9 +51,15 @@ TODO (maybe)
 - sign release
     - FIXME We need signify-openbsd because signify doesn't support `-S`. Workaround:
       `apt remove signify && apt install signify-openbsd && ln -s signify-openbsd /usr/bin/signify`
-    - FIXME Fingerprint of AVB should be the sha256 of the AVB public key but that doesn't match, for me.
+    - DONE Fingerprint of AVB should be the sha256 of the AVB public key but that doesn't match, for me.
       https://source.android.com/docs/security/features/verifiedboot/boot-flow#unlocked-devices
       https://github.com/nix-community/robotnix/blob/f941a20537384418c22000f6e6487c92441e0a7f/docs/src/modules/attestation.md?plain=1#L52C7-L52C42
+        - "ID: 9ac41741" is for unlocked bootloader, it seems. It does display the complete fingerprint when locked.
+        - DONE: Try this with my key. Only tested with official GOS, so far. -> It matches.
+    - FIXME add `--extra_apks RobotnixF-Droid.apk=PRESIGNED` in scripts/release.sh or maybe `LOCAL_CERTIFICATE := PRESIGNED` in its Android.mk
+- refactor:
+    - make build-env script also for the first steps (but not with nix)
+    - delete /grapheneos/step-done in that script and re-create when successful and use that in the checks
 - copy factory and ota zips out of the final image
 - generate differential updates
 - apply some things from robotnix:
@@ -129,4 +137,8 @@ https://source.android.com/docs/setup/build/building
 
 very helpful when editing diffs: patchutils: rediff and recountdiff
 (https://stackoverflow.com/a/34431351)
+
+Recovery mode: Power off, power on with "volume down" pressed. Select recovery and boot that. Error "no command" appears. Hold power and short press "volume up".
+see https://www.edeka-smart.de/news/android_recovery_mode_funktioniert_nicht-194
+Then, select loading update from ADB and do `adb sideload bluejay-ota_update-2024020900.zip`.
 

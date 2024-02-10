@@ -1,0 +1,45 @@
+From ee771667cd0d94ddb65ac1b2c247791cfe23b11f Mon Sep 17 00:00:00 2001
+From: x <x>
+Date: Fri, 9 Feb 2024 22:57:30 +0000
+Subject: [PATCH 3/3] adjust config.xml
+
+---
+ core/res/res/values/config.xml | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/core/res/res/values/config.xml b/core/res/res/values/config.xml
+index e018ec2139b4..5d2489394092 100644
+--- a/core/res/res/values/config.xml
++++ b/core/res/res/values/config.xml
+@@ -1097,10 +1097,10 @@
+             4 - Go to voice assist
+             5 - Go to assistant (Settings.Secure.ASSISTANT)
+     -->
+-    <integer name="config_longPressOnPowerBehavior">1</integer>
++    <integer name="config_longPressOnPowerBehavior">6</integer>
+ 
+     <!-- The time in milliseconds after which a press on power button is considered "long". -->
+-    <integer name="config_longPressOnPowerDurationMs">500</integer>
++    <integer name="config_longPressOnPowerDurationMs">300</integer>
+ 
+     <!-- The possible UI options to be surfaced for configuring long press power on duration
+          action. Value set in config_longPressOnPowerDurationMs should be one of the available
+@@ -1116,13 +1116,13 @@
+     <!-- Whether the setting to change long press on power behaviour from default to assistant (5)
+          is available in Settings.
+      -->
+-    <bool name="config_longPressOnPowerForAssistantSettingAvailable">false</bool>
++    <bool name="config_longPressOnPowerForAssistantSettingAvailable">true</bool>
+ 
+     <!-- Control the behavior when the user long presses the power button for a long time.
+             0 - Nothing
+             1 - Global actions menu
+     -->
+-    <integer name="config_veryLongPressOnPowerBehavior">0</integer>
++    <integer name="config_veryLongPressOnPowerBehavior">1</integer>
+ 
+     <!-- Control the behavior when the user presses the power and volume up buttons together.
+             0 - Nothing
+-- 
+2.34.1
+

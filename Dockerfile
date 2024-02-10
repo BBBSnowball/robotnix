@@ -52,6 +52,8 @@ FROM src as build-a1
 USER user
 WORKDIR /grapheneos
 
+#FIXME rename to match documentation: "$TARGET_PRODUCT-$TARGET_BUILD_VARIANT"
+#      https://source.android.com/docs/setup/build/building#choose-a-target
 ARG PIXEL_CODENAME=bluejay
 ARG BUILD_TARGET=user
 #ARG BUILD_TARGET=userdebug
@@ -105,37 +107,54 @@ FROM build-a4 as build-a
 
 FROM build-a as build-b1
 
-ARG robotnixPatchScript=""
+#FIXME fix this in the initial install (but not now to avoid invalidating caches)
+USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt update && apt remove -y signify && apt install -y signify-openbsd && ln -s signify-openbsd /usr/bin/signify
+USER user
+
+# We cannot skip this depending on the argument and we don't want to copy all of /nix/store into the build
+# if the argument is missing/empty. Therefore, we supply a dummy path in that case to abort the build.
+ARG robotnixPatchScript
 RUN --network=none \
-  --mount=type=bind,source=/nix,target=/nix \
-  if [ -n "$robotnixPatchScript" ] ; then "$robotnixPatchScript" ; fi
+  --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
+  "/nix/patch-sources"
 FROM build-b1 as build-b2
 
 # time taken: ~7 min ?
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m vendorbootimage" \
-  && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
+RUN --network=none \
+  --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
+  bash /nix/build-env m vendorbootimage \
+  && touch done-vendorbootimage-b || echo "step failed but don't tell BuildKit, yet"
 # If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
 # and you should immediately fall into a shell for this step (because the previous one was "successfull"
 # and has thus been cached). We allow network in here because that can be useful in the debug shell.
 FROM build-b2 as build-b3
-RUN [ -e done-vendorbootimage ]
+RUN [ -e done-vendorbootimage-b ]
 
 # time taken: 17000 sec = 4.7 h ?
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m target-files-package" \
-  && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
+RUN --network=none \
+  --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
+  bash /nix/build-env m target-files-package \
+  && touch done-target-files-package-b || echo "step failed but don't tell BuildKit, yet"
 FROM build-b3 as build-b4
-RUN [ -e done-target-files-package ]
+RUN [ -e done-target-files-package-b ]
 
 # time taken: ~2 min ?
 RUN --network=none \
-  bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && m otatools-package"
+  --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
+  bash /nix/build-env m otatools-package
 
 FROM build-b4 as build-b5
 
 # time taken: TODO
-#RUN --network=none \
-#  --mount=type=bind,source=./keys,target=/grapheneos/keys
-#  script/release.sh bluejay
+#NOTE Secrets cannot be directories so we use a tar file.
+RUN --network=none \
+  --mount=type=secret,id=keys,uid=1000,required \
+  bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && mkdir -p keys/${PIXEL_CODENAME} && tar -C keys/${PIXEL_CODENAME} -xf /run/secrets/keys && yes \"\" | script/release.sh bluejay && rm -rf keys/${PIXEL_CODENAME}"
 
 FROM build-b5 as build-b
+
+FROM scratch as build-c
+COPY --from=build-b /grapheneos/out/release-* /
 

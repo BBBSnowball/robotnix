@@ -35,6 +35,13 @@ with lib;
     };
   };
 
+  # workaround: tell release script to not try and sign F-Droid
+  #FIXME find a more general solution
+  source.dirs."script" = {
+    onlyPatches = true;
+    patches = [ ./add-fdroid-to-release-script.patch ];
+  };
+
   #apps.bromite.enable = true;  # -> better to install release via F-Droid
 
   apps.seedvault = {
@@ -48,4 +55,26 @@ with lib;
     url = "https://f-droid.org/repo/org.fdroid.fdroid_1019050.apk";
     sha256 = "sha256-OeaJO6i+QOT9IHq8i0KeHL+IFc77yINiA2avmRanz/U=";
   });
+
+  # add some patches that maybe allow us to enable torch by long press on power button
+  # (doesn't work, yet)
+  source.dirs."frameworks/base" = {
+    onlyPatches = true;
+    gitPatches = [
+      ./0001-Revert-Fix-power-long-press-behavior-could-be-change.patch
+      ./0002-copy-code-for-torch-on-long-press-on-power-from-Line.patch
+      ./0003-adjust-config.xml.patch
+    ];
+  };
+
+  # patch Updater URL
+  #FIXME robotnix does it with resources."packages/apps/Updater".url=url - can we do the same?
+  apps.updater.url = "https://192.168.89.140:8000/groot-releases";
+  source.dirs."packages/apps/Updater" = {
+    onlyPatches = true;
+    postPatch = ''
+      sed -i '/name="url"/ s@>.*<@>${config.apps.updater.url}<@' res/values/config.xml
+    '';
+  };
+  environment.buildVars.OFFICIAL_BUILD = "true";  # enables the updater
 }
