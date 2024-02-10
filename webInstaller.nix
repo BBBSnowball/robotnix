@@ -2,8 +2,8 @@
 #   mkdir -p x/releases
 #   ln -s result/index.html x/
 #   ln -s result/static x/
-#   echo abc >x/releases/bluejay-stable
-#   cp /path/to/release.zip x/releases/bluejay-factory-abc.zip
+#   docker cp elegant_lovelace:/grapheneos/out/release-bluejay-2024020300/bluejay-factory-2024020300.zip x/releases/
+#   docker cp elegant_lovelace:/grapheneos/out/release-bluejay-2024020300/bluejay-stable x/releases/
 #   nix-build webInstaller.nix -o x/result
 #   nix run nixpkgs#python3 -- -m http.server -d x
 #   open http://localhost:8000/
