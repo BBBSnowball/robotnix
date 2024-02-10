@@ -156,5 +156,5 @@ RUN --network=none \
 FROM build-b5 as build-b
 
 FROM scratch as build-c
-COPY --from=build-b /grapheneos/out/release-* /
+COPY --from=build-b /grapheneos/out/release-*/*.zip* /grapheneos/out/release-*/*-stable /
 
