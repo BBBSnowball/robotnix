@@ -72,13 +72,17 @@ with lib;
 
   # patch Updater URL
   #FIXME robotnix does it with resources."packages/apps/Updater".url=url - can we do the same?
-  #    -> see https://source.android.com/docs/setup/create/new-device#build-variants
+  #    -> see https://source.android.com/docs/setup/create/new-device#use-resource-overlays
   apps.updater.url = "http://192.168.89.140:8000/groot-releases";
-  source.dirs."packages/apps/Updater" = {
+  source.dirs."packages/apps/Updater" = mkIf false {
     onlyPatches = true;
     postPatch = ''
       sed -i '/name="url"/ s@>.*<@>${config.apps.updater.url}<@' res/values/config.xml
     '';
+  };
+  resources."packages/apps/Updater" = {
+    url = config.apps.updater.url;
+    channel_default = config.channel;
   };
   environment.buildVars.OFFICIAL_BUILD = "true";  # enables the updater
 }
