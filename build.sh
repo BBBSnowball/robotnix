@@ -56,7 +56,6 @@ if [ ! -e "$closure" ] ; then
   echo "Is the Nix store mounted to ./nix/store ?" >&2
   exit 1
 fi
-ln -sfT "$closure" result-patchScript5
 #NOTE Passing a pipe for the secret doesn't work, i.e. not `src=<(tar ...)`.
 tar -C keys/bluejay -cf keys/bluejay.tar .
 time ( set -x; docker build --file Dockerfile --tag "gos-build2-$tag" . --progress=plain "$@" --build-arg robotnixPatchScript="$closure" --secret id=keys,src=./keys/bluejay.tar --output type=local,dest=./out/build2-$tag/ $extraArgs )

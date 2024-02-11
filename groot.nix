@@ -58,12 +58,18 @@ in
 
   config.build.buildEnvScript2 = let
   in ''
+    # This is basically the same as with-env-dont-fail.sh but we may set additional variables.
     set -eo pipefail
+    rm -f step-done
     shopt -s expand_aliases
     source build/envsetup.sh
     lunch ''${TARGET_PRODUCT}-''${TARGET_BUILD_VARIANT}
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.environment.buildVars)}
-    eval "$@"
+    if eval "$@" ; then
+      touch step-done
+    else
+      echo "step failed but don't tell BuildKit, yet" >&2
+    fi
   '';
 
   config.build.buildEnvScript3 = pkgs.writeShellScript "build-env" config.build.buildEnvScript2;
