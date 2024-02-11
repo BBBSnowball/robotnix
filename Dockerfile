@@ -8,11 +8,13 @@ FROM docker.io/library/ubuntu@sha256:e6173d4dc55e76b87c4af8db8821b1feae4146dd473
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt update && apt install -y iproute2 tig htop tmux byobu vim \
-  repo python3 git gnupg openssh-server diffutils libfreetype6 fontconfig fonts-dejavu-core libncurses5 libncurses5-dev openssl rsync unzip zip yarn e2fsprogs gperf python3-protobuf gcc-multilib signify \
+  repo python3 git gnupg openssh-server diffutils libfreetype6 fontconfig fonts-dejavu-core libncurses5 libncurses5-dev openssl rsync unzip zip yarn e2fsprogs gperf python3-protobuf gcc-multilib signify-openbsd \
   ca-certificates curl gnupg \
   xz-utils bzip2 m4 \
-  && apt remove -v cmdtest
+  && apt remove -v cmdtest \
+  && ln -s signify-openbsd /usr/bin/signify
 # (cmdtest has a yarn binary but not the one that we need)
+# (signify-openbsd has the ELF with the wrong name but that's better than the signify package, which doesn't support `-S`)
 
 # https://github.com/nodesource/distributions?tab=readme-ov-file#using-ubuntu-2
 # https://github.com/nodesource/distributions/wiki/Repository-Manual-Installation
@@ -52,13 +54,12 @@ FROM src as build-a1
 USER user
 WORKDIR /grapheneos
 
-#FIXME rename to match documentation: "$TARGET_PRODUCT-$TARGET_BUILD_VARIANT"
-#      https://source.android.com/docs/setup/build/building#choose-a-target
-ARG PIXEL_CODENAME=bluejay
+ARG TARGET_PRODUCT=bluejay
 # see https://source.android.com/docs/setup/create/new-device#build-variants
-ARG BUILD_TARGET=user
-#ARG BUILD_TARGET=userdebug
-#ARG BUILD_TARGET=eng
+# and https://source.android.com/docs/setup/build/building#choose-a-target
+#ARG TARGET_BUILD_VARIANT=user
+ARG TARGET_BUILD_VARIANT=userdebug
+#ARG TARGET_BUILD_VARIANT=eng
 
 #NOTE Here is some documentation on how the mount with type=cache works:
 # https://github.com/moby/buildkit/issues/1673#issuecomment-1264502398
@@ -80,12 +81,12 @@ RUN --network=none \
 
 # This needs `eval` because the alias for adevtool is defined by envsetup.
 RUN --mount=type=cache,id=adevtool-dl,target=/grapheneos/vendor/adevtool/dl,uid=1000,sharing=locked \
-  bash -O expand_aliases -c "source build/envsetup.sh && eval adevtool generate-all -d $PIXEL_CODENAME"
+  bash -O expand_aliases -c "source build/envsetup.sh && eval adevtool generate-all -d $TARGET_PRODUCT"
 
 FROM build-a1 as build-a2
 
 # time taken: ~13 min
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m vendorbootimage" \
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${TARGET_PRODUCT}-${TARGET_BUILD_VARIANT} && eval m vendorbootimage" \
   && touch done-vendorbootimage || echo "step failed but don't tell BuildKit, yet"
 # If the previous step has failed, BuildKit will see the error here. Restart with `--invoke=on-error`
 # and you should immediately fall into a shell for this step (because the previous one was "successfull"
@@ -94,26 +95,20 @@ FROM build-a2 as build-a3
 RUN [ -e done-vendorbootimage ]
 
 # time taken: 17000 sec = 4.7 h
-RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && eval m target-files-package" \
+RUN --network=none bash -O expand_aliases -c "source build/envsetup.sh && eval lunch ${TARGET_PRODUCT}-${TARGET_BUILD_VARIANT} && eval m target-files-package" \
   && touch done-target-files-package || echo "step failed but don't tell BuildKit, yet"
 FROM build-a3 as build-a4
 RUN [ -e done-target-files-package ]
 
 # time taken: ~2 min
 RUN --network=none \
-  bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && m otatools-package"
+  bash -c "source build/envsetup.sh && eval lunch ${TARGET_PRODUCT}-${TARGET_BUILD_VARIANT} && m otatools-package"
 
 FROM build-a4 as build-a
 
 
 
 FROM build-a as build-b1
-
-#FIXME fix this in the initial install (but not now to avoid invalidating caches)
-USER root
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt update && apt remove -y signify && apt install -y signify-openbsd && ln -s signify-openbsd /usr/bin/signify
-USER user
 
 # We cannot skip this depending on the argument and we don't want to copy all of /nix/store into the build
 # if the argument is missing/empty. Therefore, we supply a dummy path in that case to abort the build.
@@ -122,9 +117,6 @@ RUN --network=none \
   --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
   "/nix/patch-sources"
 FROM build-b1 as build-b2
-
-#FIXME don't commit
-ARG BUILD_TARGET=userdebug
 
 # time taken: ~7 min ?
 RUN --network=none \
@@ -156,7 +148,7 @@ FROM build-b4 as build-b5
 #NOTE Secrets cannot be directories so we use a tar file.
 RUN --network=none \
   --mount=type=secret,id=keys,uid=1000,required \
-  bash -c "source build/envsetup.sh && eval lunch ${PIXEL_CODENAME}-${BUILD_TARGET} && mkdir -p keys/${PIXEL_CODENAME} && tar -C keys/${PIXEL_CODENAME} -xf /run/secrets/keys && yes \"\" | script/release.sh bluejay && rm -rf keys/${PIXEL_CODENAME}"
+  bash -c "source build/envsetup.sh && eval lunch ${TARGET_PRODUCT}-${TARGET_BUILD_VARIANT} && mkdir -p keys/${TARGET_PRODUCT} && tar -C keys/${TARGET_PRODUCT} -xf /run/secrets/keys && yes \"\" | script/release.sh bluejay && rm -rf keys/${TARGET_PRODUCT}"
 
 FROM build-b5 as build-b
 

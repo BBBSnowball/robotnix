@@ -61,7 +61,7 @@ in
     set -eo pipefail
     shopt -s expand_aliases
     source build/envsetup.sh
-    lunch ''${PIXEL_CODENAME}-''${BUILD_TARGET}
+    lunch ''${TARGET_PRODUCT}-''${TARGET_BUILD_VARIANT}
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.environment.buildVars)}
     eval "$@"
   '';
