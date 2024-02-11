@@ -99,6 +99,7 @@ TODO (maybe)
     - /grapheneos/frameworks/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
         - [in LineageOS](https://github.com/LineageOS/android_frameworks_base/blob/lineage-20.0/services/core/java/com/android/server/policy/PhoneWindowManager.java)
         - mDeviceKeyHandlers loaded via PathClassLoader - could be useful to add key handlers in external code
+    - `config_supportLongPressPowerWhenNonInteractive`
 
 Some random notes
 =================
@@ -141,4 +142,39 @@ very helpful when editing diffs: patchutils: rediff and recountdiff
 Recovery mode: Power off, power on with "volume down" pressed. Select recovery and boot that. Error "no command" appears. Hold power and short press "volume up".
 see https://www.edeka-smart.de/news/android_recovery_mode_funktioniert_nicht-194
 Then, select loading update from ADB and do `adb sideload bluejay-ota_update-2024020900.zip`.
+
+other settings:
+config_allowAllRotations=true
+config_useCurrentRotationOnRotationLockChange=true
+config_reverseDefaultRotation ?
+config_doublePressOnPowerBehavior and config_doublePressOnPowerTargetActivity ?
+config_triplePressOnPowerBehavior = 2  // brightness boost
+config_screenBrightnessSettingMinimum ?
+config_dozePickupGestureEnabled=false
+config_safe_media_volume_index is 10 by default
+config_safe_media_volume_enabled=false
+
+config_cameraDoubleTapPowerGestureEnabled ?
+config_emergencyGestureEnabled ?  -> power button, multiple times -> settings says five times
+config_defaultEmergencyGestureEnabled=false ?
+config_packagedKeyboardName -> auto-pair to bluetooth keyboard
+config_multiuserMaximumUsers ?
+config_multiuserMaxRunningUsers ?
+config_enableMultiUserUI ?
+config_recentsComponentName ?
+config_globalActionsList !
+config_veryLongPressTimeout: default is 3500 but that takes *ages*
+config_displayColorFadeDisabled = false?
+config_allowPriorityVibrationsInLowPowerMode ?
+
+https://source.android.com/docs/setup/create/new-device#ANDROID_VENDOR_KEYS
+-> pre-authenticate ADB (and then maybe disable manual auth?)
+-> manual might be disabled via config_customAdbPublicKeyConfirmationComponent, I think; and config_customAdbWifiNetworkConfirmationComponent
+
+*gesture*
+
+
+./out/target/product/bluejay/recovery/root/default.prop
+persist.security.deny_new_usb
+ro.debuggable=0
 

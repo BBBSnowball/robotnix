@@ -18,14 +18,15 @@ with lib;
   signing.apex.enable = false;
   signing.signTargetFilesArgs = [ "--extra_apks OsuLogin.apk,ServiceWifiResources.apk=$KEYSDIR/${config.device}/releasekey" ];
 
-  signing.avb.fingerprint = "TODO";
+  # sha256sum keys/bluejay/avb_pkmd.bin
+  signing.avb.fingerprint = "ec6dd6633a4a48abac0e24c7d01b108352d1c21708fce877f441d0d318e60bfc";
 
   #FIXME aborts with an error
   #apps.auditor.enable = true;
   #apps.auditor.domain = "TODO";
 
   apps.fdroid = {
-    enable = true;
+    enable = false;
     additionalRepos = {
       bromite = {
         url = "https://fdroid.bromite.org/fdroid/repo";
@@ -37,7 +38,7 @@ with lib;
 
   # workaround: tell release script to not try and sign F-Droid
   #FIXME find a more general solution
-  source.dirs."script" = {
+  source.dirs."script" = lib.mkIf config.apps.fdroid.enable {
     onlyPatches = true;
     patches = [ ./add-fdroid-to-release-script.patch ];
   };
@@ -45,20 +46,22 @@ with lib;
   #apps.bromite.enable = true;  # -> better to install release via F-Droid
 
   apps.seedvault = {
-    enable = true;
+    enable = false;
     #includedInFlavor = true;
   };
 
   # robotnix uses an old version that isn't available anymore so let's update it
   # see https://f-droid.org/en/packages/org.fdroid.fdroid/
-  apps.prebuilt."F-Droid".apk = lib.mkForce (pkgs.fetchurl {
-    url = "https://f-droid.org/repo/org.fdroid.fdroid_1019050.apk";
-    sha256 = "sha256-OeaJO6i+QOT9IHq8i0KeHL+IFc77yINiA2avmRanz/U=";
-  });
+  apps.prebuilt."F-Droid" = lib.mkIf config.apps.fdroid.enable {
+    apk = lib.mkForce (pkgs.fetchurl {
+      url = "https://f-droid.org/repo/org.fdroid.fdroid_1019050.apk";
+      sha256 = "sha256-OeaJO6i+QOT9IHq8i0KeHL+IFc77yINiA2avmRanz/U=";
+    });
+  };
 
   # add some patches that maybe allow us to enable torch by long press on power button
   # (doesn't work, yet)
-  source.dirs."frameworks/base" = {
+  source.dirs."frameworks/base" = lib.mkIf false {
     onlyPatches = true;
     gitPatches = [
       ./0001-Revert-Fix-power-long-press-behavior-could-be-change.patch
@@ -69,7 +72,8 @@ with lib;
 
   # patch Updater URL
   #FIXME robotnix does it with resources."packages/apps/Updater".url=url - can we do the same?
-  apps.updater.url = "https://192.168.89.140:8000/groot-releases";
+  #    -> see https://source.android.com/docs/setup/create/new-device#build-variants
+  apps.updater.url = "http://192.168.89.140:8000/groot-releases";
   source.dirs."packages/apps/Updater" = {
     onlyPatches = true;
     postPatch = ''

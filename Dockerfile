@@ -55,8 +55,10 @@ WORKDIR /grapheneos
 #FIXME rename to match documentation: "$TARGET_PRODUCT-$TARGET_BUILD_VARIANT"
 #      https://source.android.com/docs/setup/build/building#choose-a-target
 ARG PIXEL_CODENAME=bluejay
+# see https://source.android.com/docs/setup/create/new-device#build-variants
 ARG BUILD_TARGET=user
 #ARG BUILD_TARGET=userdebug
+#ARG BUILD_TARGET=eng
 
 #NOTE Here is some documentation on how the mount with type=cache works:
 # https://github.com/moby/buildkit/issues/1673#issuecomment-1264502398
@@ -120,6 +122,9 @@ RUN --network=none \
   --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
   "/nix/patch-sources"
 FROM build-b1 as build-b2
+
+#FIXME don't commit
+ARG BUILD_TARGET=userdebug
 
 # time taken: ~7 min ?
 RUN --network=none \
