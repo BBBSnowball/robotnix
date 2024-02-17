@@ -1,3 +1,18 @@
+**This branch is not part of normal/upstream robotnix.**
+
+If you want robotnix, see [upstream](https://github.com/nix-community/robotnix).
+
+So, what is in this branch?
+
+1. We use Docker to build Android for Pixel 6a (bluejay).
+   That's not as nice as a real Nix build but it makes it easier to track upstream changes.
+2. We apply config options from robotnix to the Docker build.
+3. We use it to build an image with the F-Droid privileged extension and root access, which weakens
+   the security model of GrapheneOS (which we use as the base) and is frowned upon by upstream devs
+   (for good reason! don't blame them!), so we call the result GRoot. These changes are applied via
+   robotnix, so you can choose which of these you want.
+
+
 Build it
 ========
 
