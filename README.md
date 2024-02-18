@@ -19,7 +19,7 @@ Build it
 1. Prepare:
     1. Mount a btrfs filesystem to `~/.local/share/docker` and configure Docker to use the btrfs storage driver.
         - We assume that reflink copies will be fast (fast-ish - the source tree has tons of files) and take up
-          almost no space. You may have a bad time if that doesn't hold on your system (or Docker's layer system
+          almost no space. You may have a bad time if that doesn't hold true on your system (or Docker's layer system
           *might* save you - we have never tried to be honest).
         - This can give some indication of whether this is configured correctly:
           `docker build --file Dockerfile-test-reflink . --progress=plain`
@@ -29,18 +29,27 @@ Build it
           you can copy out result files and still have them reflinked. In other words, mount the btrfs at a
           location of your choice and bind mount a directory on it to `~/.local/share/docker`.
     2. Increase log limit for BuildKit.
-        - Set `BUILDKIT_STEP_LOG_MAX_SIZE` and `BUILDKIT_STEP_LOG_MAX_SPEED` for the Docker daemon
+        - Set `BUILDKIT_STEP_LOG_MAX_SIZE=1073741824` and `BUILDKIT_STEP_LOG_MAX_SPEED=10485760` for the Docker daemon
           (or create a new builder with these settings and use it for all the Docker commands here).
         - Test with: `docker build --file Dockerfile-test-log-limit . --progress=plain --no-cache`
     3. Mount Nix store into build context:
         `mkdir nix/store && sudo mount --bind /nix/store ./nix/store`
+    4. You can find our config [here](https://github.com/BBBSnowball/nixcfg/blob/main/hosts/framework/gos.nix)
+       (well, you will be - not pushed, yet, at the time of writing). This includes all of the previous steps.
+    5. Generate signing keys.
+        - FIXME: Describe how to do this.
+        - Fingerprint is the SHA256 hash of `keys/bluejay/avb_pkmd.bin`. This should match the fingerprint that is
+          displayed by the bootloader (in part for some older devices but bluejay displays the full fingerprint).
+          If the bootloader is not locked, it will display "ID: 9ac41741" instead of the fingerprint.
+        - For more info see [here](https://source.android.com/docs/security/features/verifiedboot/boot-flow#unlocked-devices)
+          and [here](https://github.com/nix-community/robotnix/blob/f941a20537384418c22000f6e6487c92441e0a7f/docs/src/modules/attestation.md?plain=1#L52C7-L52C42).
 2. Run build:
     1. Choose tag: `tag=2024011600` or `tag=$(./get-latest-release.sh)`
     2. `./build.sh $tag`. This will run these steps for you:
         1. Initial clone of sources - takes much longer than update to a new tag (only the first time):
            `docker build --file Dockerfile-initial-clone --tag gos-src-initial . && docker image tag gos-src-latest`
         2. Update sources and checkout worktree:
-           `docker build --file Dockerfile-clone-tag --tag gos-src-$tag . --progres=plain --build-arg TAG_NAME=refs/tags/$tag`
+           `docker build --file Dockerfile-clone-tag --tag gos-src-$tag . --progress=plain --build-arg TAG_NAME=refs/tags/$tag`
         3. Tag image with `gos-src-latest`, which will be used for builds and the next updates:
            `docker image tag gos-src-$tag gos-src-latest`
         4. Build it:
@@ -57,47 +66,37 @@ Build it
           `docker build --file Dockerfile . --target src --tag x && docker run --rm -it x`
         - You can run a container with a bind mount for `/nix`:
           `docker run -it --mount type=bind,source=/nix,target=/nix ubuntu:22.04`
-    1. Save contents of caches in an image:
+    2. Save contents of caches in an image:
        `docker build --file Dockerfile-save-caches --tag gos-caches . --build-arg cache_buster=$num && docker run --rm -it gos-caches find /cache -maxdepth 2`
 
 TODO (maybe)
 ============
 
 - sign release
-    - FIXME We need signify-openbsd because signify doesn't support `-S`. Workaround:
-      `apt remove signify && apt install signify-openbsd && ln -s signify-openbsd /usr/bin/signify`
-    - DONE Fingerprint of AVB should be the sha256 of the AVB public key but that doesn't match, for me.
-      https://source.android.com/docs/security/features/verifiedboot/boot-flow#unlocked-devices
-      https://github.com/nix-community/robotnix/blob/f941a20537384418c22000f6e6487c92441e0a7f/docs/src/modules/attestation.md?plain=1#L52C7-L52C42
-        - "ID: 9ac41741" is for unlocked bootloader, it seems. It does display the complete fingerprint when locked.
-        - DONE: Try this with my key. Only tested with official GOS, so far. -> It matches.
     - FIXME add `--extra_apks RobotnixF-Droid.apk=PRESIGNED` in scripts/release.sh or maybe `LOCAL_CERTIFICATE := PRESIGNED` in its Android.mk
-- refactor:
-    - make build-env script also for the first steps (but not with nix)
-    - delete /grapheneos/step-done in that script and re-create when successful and use that in the checks
-- copy factory and ota zips out of the final image
 - generate differential updates
 - apply some things from robotnix:
     - idea: build the config attrset and then implement some of the low-level things
       (and extract the relevant parts so we can change some setting and see whether this changes anything that we support)
     - set URL of update server in packages/apps/Updater/res/values/config.xml
-    - install Bromite in addition to Vanadium (adblock, user scripts) but keep Vanadium for webview
-    - fdroid
+    - DONE install Bromite in addition to Vanadium (adblock, user scripts) but keep Vanadium for webview -> better to add the F-Droid repo so it will be updated
+    - DONE fdroid
     - signature spoofing ?
     - remote attestation
 - add to robotnix?
     - pre-approve adb keys
     - root (see below)
-    - wifi credentials
+    - WONTFIX wifi credentials -> sharing by QR code is easy enough and it's better to not put any secrets into the image because OTA server is usually public
     - backup url for setup wizard
-    - patch seedvault to lie and say that it wants to move data to a new device, which allows making a backup of more apps
+    - DONE (not by us) patch seedvault to lie and say that it wants to move data to a new device, which allows making a backup of more apps
         - NOTE: SeedVault doesn't appear as an app. Search for backup in settings.
         - There is an experimental setting for "device-to-device" backups. Nice!
 - allow root for adb (which is enough, for now)
-    - userdebug build might already allow this
+    - userdebug build might already allow this -> it does.
     - su looks at some property that we can change
         - some "ro.xx" properties are mentioned in the GrapheneOS build instructions - they might be in the same place
     - robotnix: description for `variant` says: "`userdebug` is like user but with root access and debug capability."
+    - So... can we only allow it for ADB and maybe only for pre-approved keys?
 - remote attestation for access to backups
 - somehow backup/sync browser bookmarks
     - ideally to some sort of Zettelkasten
