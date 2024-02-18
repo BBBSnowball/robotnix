@@ -137,7 +137,7 @@ RUN --network=none \
 FROM build-b2 as build-b3
 RUN [ -e step-done ]
 
-# time taken: 17000 sec = 4.7 h ?
+# time taken: 17000 sec = 4.7 h ?  -> more like 10 min to 3h
 RUN --network=none \
   --mount=type=bind,source=${robotnixPatchScript:-/argument-missing}/nix,target=/nix \
   bash /nix/build-env m target-files-package
@@ -152,7 +152,7 @@ RUN --network=none \
 FROM build-b4 as build-b5
 RUN [ -e step-done ]
 
-# time taken: TODO
+# time taken: 12 min
 #NOTE Secrets cannot be directories so we use a tar file.
 RUN --network=none \
   --mount=type=secret,id=keys,uid=1000,required \
@@ -162,4 +162,6 @@ FROM build-b5 as build-b
 
 FROM scratch as build-c
 COPY --from=build-b /grapheneos/out/release-*/*.zip* /grapheneos/out/release-*/*-stable /
+FROM scratch as build-d
+COPY --from=build-c /*factory*.zip* /*ota_update*.zip* /*-stable /
 
