@@ -1,3 +1,4 @@
 [submodule "robotnix"]
 	path = robotnix
 	url = https://github.com/nix-community/robotnix
+	branch = robotnix-groot
