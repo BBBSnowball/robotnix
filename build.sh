@@ -49,8 +49,11 @@ time ( set -x; docker build --file Dockerfile --tag "gos-build-$tag" . --progres
 (set -x; docker image tag "gos-build-$tag" gos-build-latest )
 
 echo "== build with patches =="
-( set -x; nix-build groot-main.nix -A config.build.unpackScript4 -o result-unpackScript4 )
-closure="./$(realpath ./result-unpackScript4)"
+( set -x; nix-build groot-main.nix -A config.build.unpackScript4 -o result-robotnix-script )
+closure="./$(realpath ./result-robotnix-script)"
+closureHash="${closure##*/}"
+closureHash="${closureHash%%-*}"
+outputDir=./out/build2-$tag-$(date '+%Y%m%d-%H%M')-$closureHash
 if [ ! -e "$closure" ] ; then
   echo "Patch script doesn't exist in build context: $closure" >&2
   echo "Is the Nix store mounted to ./nix/store ?" >&2
@@ -58,6 +61,8 @@ if [ ! -e "$closure" ] ; then
 fi
 #NOTE Passing a pipe for the secret doesn't work, i.e. not `src=<(tar ...)`.
 tar -C keys/bluejay -cf keys/bluejay.tar .
-time ( set -x; docker build --file Dockerfile --tag "gos-build2-$tag" . --progress=plain "$@" --build-arg robotnixPatchScript="$closure" --secret id=keys,src=./keys/bluejay.tar --output type=local,dest=./out/build2-$tag/ $extraArgs )
+time ( set -x; docker build --file Dockerfile --tag "gos-build2-$tag" . --progress=plain "$@" --build-arg robotnixPatchScript="$closure" --secret id=keys,src=./keys/bluejay.tar --output type=local,dest="$outputDir/" $extraArgs )
 (set -x; docker image tag "gos-build2-$tag" gos-build2-latest )
+
+ln -s $closure $outputDir/robotnix-script
 
