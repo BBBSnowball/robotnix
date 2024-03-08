@@ -54,7 +54,7 @@ RUN --network=none \
 # This turned out to be necessary for some reason.
 #FIXME Do we still need it? Can we use `repo forall`?
 #RUN repo list | while read path _ _ ; do ( cd "$path" && git reset --hard ) ; done
-RUN repo forall -c git reset --hard
+RUN repo forall --abort-on-errors -c git reset --hard
 
 
 ################################################
