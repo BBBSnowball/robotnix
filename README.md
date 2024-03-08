@@ -114,6 +114,12 @@ TODO (maybe)
         - [in LineageOS](https://github.com/LineageOS/android_frameworks_base/blob/lineage-20.0/services/core/java/com/android/server/policy/PhoneWindowManager.java)
         - mDeviceKeyHandlers loaded via PathClassLoader - could be useful to add key handlers in external code
     - `config_supportLongPressPowerWhenNonInteractive`
+- make variant of Auditor
+    - from my older attempt:
+        - `find . -exec sed -i 's/app.attestation.auditor/app.attestation.auditorGroot/g' {} \+`
+        - `git checkout app/src/main/res/raw/deflate_dictionary_2.bin`  (dictionary for compression - keep this as is)
+        - other changes in: app/src/main/java/app/attestation/auditor/AttestationProtocol.java (e.g. fingerprints)
+        - other changes in: app/src/main/res/raw/deflate_dictionary_2.bin (unmodified official release -> unmodified release)
 
 Some random notes
 =================
