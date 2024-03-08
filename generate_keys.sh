@@ -29,10 +29,10 @@ if [ ! -e keys/$DEVICE/factory.pub ] ; then
   signify -G -n -p keys/$DEVICE/factory.pub -s keys/$DEVICE/factory.sec
 fi
 
-if [ ! -e keys/$DEVICE/apps/vanadium.keystore ] ; then
-  mkdir -p keys/$DEVICE/apps
-  keytool -genkey -v -keystore keys/$DEVICE/apps/vanadium.keystore -storetype pkcs12 -alias vanadium \
+if [ ! -e keys/apps/vanadium.keystore ] ; then
+  mkdir -p keys/apps
+  keytool -genkey -v -keystore keys/apps/vanadium.keystore -storetype pkcs12 -alias vanadium \
     -keyalg RSA -keysize 4096 -sigalg SHA512withRSA -validity 10000 -dname "cn=$CN"
-  keytool -export-cert -alias vanadium -keystore vanadium.keystore | sha256sum >keys/$DEVICE/apps/vanadium.trichrome_certdigest.txt
+  keytool -export-cert -alias vanadium -keystore vanadium.keystore | sha256sum >keys/apps/vanadium.trichrome_certdigest.txt
 fi
 
