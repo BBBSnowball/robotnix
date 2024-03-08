@@ -62,7 +62,8 @@ fi
 #NOTE Passing a pipe for the secret doesn't work, i.e. not `src=<(tar ...)`.
 tar -C keys/bluejay -cf keys/bluejay.tar .
 time ( set -x; docker build --file Dockerfile --tag "gos-build2-$tag" . --progress=plain "$@" --build-arg robotnixPatchScript="$closure" --secret id=keys,src=./keys/bluejay.tar --output type=local,dest="$outputDir/" $extraArgs )
-(set -x; docker image tag "gos-build2-$tag" gos-build2-latest )
+# We won't have any tagged image for this build because of `--output type=local`.
+#(set -x; docker image tag "gos-build2-$tag" gos-build2-latest )
 
-ln -s $closure $outputDir/robotnix-script
+ln -s $(realpath $closure) $outputDir/robotnix-script
 
