@@ -1,5 +1,10 @@
 { lib, pkgs, config, ... }:
 with lib;
+let
+  fileExists = name: builtins.getDir ./. ? name;
+  private = if fileExists "private.nix" then source ./private.nix else lib.warn "private.nix is missing" {};
+  myDomain = private.domain or "groot.example.com";
+in
 {
   imports = [ ./groot.nix ];
 
@@ -20,11 +25,11 @@ with lib;
 
   # sha256sum keys/bluejay/avb_pkmd.bin
   #FIXME put this into the auditor app (in caps) and make a rebranded Auditor app for checking it on other devices
-  signing.avb.fingerprint = lib.toUpper "ec6dd6633a4a48abac0e24c7d01b108352d1c21708fce877f441d0d318e60bfc";
+  signing.avb.fingerprint = lib.toUpper "b68c2f54fa312e531a176b6322e16c3580b9043439616944d2e1beb825f9b927";
 
   #FIXME aborts with an error
-  apps.auditor.enable = true;
-  apps.auditor.domain = "TODO";
+  #apps.auditor.enable = true;
+  #apps.auditor.domain = "TODO";
 
   apps.fdroid = {
     enable = true;
@@ -78,7 +83,7 @@ with lib;
 
   # patch Updater URL
   #FIXME Make this a proper mkIf for variant grapheneos-docker.
-  apps.updater.url = "http://192.168.89.140:8000/groot-releases";
+  apps.updater.url = "https://${myDomain}/updates";
   # see https://source.android.com/docs/setup/create/new-device#use-resource-overlays
   resources."packages/apps/Updater" = {
     url = config.apps.updater.url;

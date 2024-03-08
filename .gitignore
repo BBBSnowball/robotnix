@@ -5,3 +5,4 @@ result-*
 /nix/
 /x/
 /out/
+private.nix
