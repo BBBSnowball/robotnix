@@ -21,11 +21,7 @@ RUN --mount=type=bind,src=grapheneos_allowed_signers,dst=/tmp/grapheneos_allowed
 # Manifests for release tags are generated with `repo manifest -r`, i.e. we know all the hashes, so we can
 # quickly skip any repos that haven't changed. If nothing has changed this makes a difference of 17 sec vs 90 sec.
 # --jobs-network=4: "increase our calm" to avoid 429 errors for HTTP on AOSP sources
-RUN repo sync --jobs-network=4 --retry-fetches=3 --force-sync -v --optimized-fetch --no-tags
-
-# This turned out to be necessary for some reason.
-RUN repo list | while read path _ _ ; do ( cd "$path" && git reset --hard ) ; done
-
+RUN repo sync --jobs-network=4 --retry-fetches=3 --force-sync -v --optimized-fetch --no-tags --network-only
 
 # same thing for the kernel
 #RUN mkdir -p android/kernel/bluejay

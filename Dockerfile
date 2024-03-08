@@ -46,6 +46,17 @@ FROM gos-src-latest as src
 RUN rm -rf bin  boot  dev  etc  home  lib  lib32  lib64  libx32  media  mnt  nix  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
 COPY --from=build-tools / /
 
+# We haven't checked out the sources so far. This keeps the image small, which is
+# cheaper but also the server will be created faster.
+RUN --network=none \
+  repo sync -j8 --force-sync -v --optimized-fetch --no-tags --local-only
+
+# This turned out to be necessary for some reason.
+#FIXME Do we still need it? Can we use `repo forall`?
+#RUN repo list | while read path _ _ ; do ( cd "$path" && git reset --hard ) ; done
+RUN repo forall -c git reset --hard
+
+
 ################################################
 ### part 3: build plain upstream variant     ###
 ################################################
