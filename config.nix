@@ -1,8 +1,8 @@
 { lib, pkgs, config, ... }:
 with lib;
 let
-  fileExists = name: builtins.getDir ./. ? name;
-  private = if fileExists "private.nix" then source ./private.nix else lib.warn "private.nix is missing" {};
+  fileExists = name: builtins.readDir ./. ? "${name}";
+  private = if fileExists "private.nix" then import ./private.nix else lib.warn "private.nix is missing" {};
   myDomain = private.domain or "groot.example.com";
 in
 {
